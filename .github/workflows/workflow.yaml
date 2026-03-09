@@ -53,23 +53,23 @@ jobs:
         run: |
           git submodule update --init --recursive
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
+      - name: Install Toolchain and Compression Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi ninja-build
+          sudo apt-get install -y gcc-arm-none-eabi ninja-build python3-pip xz-utils
+          pip3 install --user serial
 
-      - name: Build with script
+      - name: Build BL602
         run: |
-          chmod +x platforms/gen_all.sh
-          ./platforms/gen_all.sh ${{ matrix.platform }} ${{ matrix.variant }}
+          # Скрипт build.py сам определит платформу и создаст сжатый OTA если инструменты установлены
+          python3 .github/scripts/build.py ${{ matrix.platform }} ${{ matrix.variant }}
 
-      - name: Upload Artifacts
+      - name: Upload OTA Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}_${{ matrix.variant }}_${{ needs.refs.outputs.version }}
-          path: output/*.bin
+          name: ${{ matrix.platform }}_${{ matrix.variant }}_OTA_${{ needs.refs.outputs.version }}
+          path: |
+            output/*.bin
+            output/*.ota
+            output/*.xz
+            output/*.bin.ota
