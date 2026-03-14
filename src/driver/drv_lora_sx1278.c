@@ -1,20 +1,17 @@
 #include "../new_common.h"
 
-// Оборачиваем ВЕСЬ файл, чтобы он компилировался ТОЛЬКО для ESP32
 #if PLATFORM_ESPIDF
 
 #include "../new_pins.h"
 #include "../new_cfg.h"
 #include "../logging/logging.h"
 #include "drv_public.h"
+#include "drv_local.h"
 #include "../hal/hal_pins.h"
-#include <string.h>
 
-// Специфичные инклуды для ESP32-C3
+#include <string.h>
 #include "driver/spi_master.h"
 #include "esp_log.h"
-
-#define delay_ms OS_DelayMs
 
 // Глобальная переменная для SPI
 static spi_device_handle_t lora_spi;
