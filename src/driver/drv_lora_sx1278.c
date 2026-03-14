@@ -7,9 +7,9 @@
 #include "hal/hal_pins.h"
 #include <string.h>
 
-// Используем общие функции SPI OpenBK
-extern void SPI_WriteByte(uint8_t b);
-extern uint8_t SPI_ReadByte();
+// Эти функции точно есть в OpenBK (см. drv_spi.h / drv_main.c)
+extern void SPI_Write(byte *data, int len);
+extern void SPI_Read(byte *data, int len);
 
 #define LORA_NSS  7
 #define LORA_RST  10
@@ -18,17 +18,20 @@ extern uint8_t SPI_ReadByte();
 static const char *ENCRYPT_KEY = "1234567890ABCDEF";
 
 void LoRa_WriteReg(uint8_t addr, uint8_t val) {
+    uint8_t data[2];
+    data[0] = addr | 0x80;
+    data[1] = val;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    SPI_WriteByte(addr | 0x80);
-    SPI_WriteByte(val);
+    SPI_Write(data, 2);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
 }
 
 uint8_t LoRa_ReadReg(uint8_t addr) {
-    uint8_t res;
+    uint8_t cmd = addr & 0x7F;
+    uint8_t res = 0;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    SPI_WriteByte(addr & 0x7F);
-    res = SPI_ReadByte();
+    SPI_Write(&cmd, 1);
+    SPI_Read(&res, 1);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
     return res;
 }
