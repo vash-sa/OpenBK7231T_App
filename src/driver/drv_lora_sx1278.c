@@ -1,4 +1,8 @@
 #include "../new_common.h"
+
+// Оборачиваем ВЕСЬ файл, чтобы он компилировался ТОЛЬКО для ESP32
+#if PLATFORM_ESPIDF
+
 #include "../new_pins.h"
 #include "../logging/logging.h"
 #include "drv_public.h"
@@ -126,3 +130,4 @@ void LoRa_RunFrame() {
         }
     }
 }
+#endif // PLATFORM_ESPIDF - ЭТО В САМЫЙ КОНЕЦ ФАЙЛА
