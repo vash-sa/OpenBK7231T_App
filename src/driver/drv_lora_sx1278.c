@@ -7,12 +7,15 @@
 #include "../new_cfg.h"
 #include "../logging/logging.h"
 #include "drv_public.h"
-#include "hal/hal_pins.h"
+// ИСПРАВЛЕНО: убрали hal/
+#include "hal_pins.h"
 #include <string.h>
 
 // Специфичные инклуды для ESP32-C3
 #include "driver/spi_master.h"
 #include "esp_log.h"
+
+#define delay_ms OS_DelayMs
 
 // Глобальная переменная для SPI
 static spi_device_handle_t lora_spi;
@@ -52,7 +55,6 @@ uint8_t LoRa_ReadReg(uint8_t addr) {
 }
 
 void LoRa_Init_Driver() {
-    // Настройка SPI шины
     spi_bus_config_t buscfg = {
         .miso_io_num = 5,
         .mosi_io_num = 6,
@@ -64,7 +66,7 @@ void LoRa_Init_Driver() {
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 1*1000*1000,
         .mode = 0,
-        .spics_io_num = -1, // Ручное управление CS (пин 7)
+        .spics_io_num = -1, 
         .queue_size = 7
     };
     
@@ -75,13 +77,11 @@ void LoRa_Init_Driver() {
     HAL_PIN_Setup_Output(LORA_RST);
     HAL_PIN_Setup_Input(LORA_DIO0);
 
-    // Reset LoRa
     HAL_PIN_SetOutputValue(LORA_RST, 0);
     delay_ms(10);
     HAL_PIN_SetOutputValue(LORA_RST, 1);
     delay_ms(10);
 
-    // Настройка регистров
     LoRa_WriteReg(0x01, 0x80); 
     LoRa_WriteReg(0x06, 0x6C); 
     LoRa_WriteReg(0x07, 0x80); 
@@ -91,7 +91,7 @@ void LoRa_Init_Driver() {
     LoRa_WriteReg(0x26, 0x08); 
     LoRa_WriteReg(0x01, 0x85); 
     
-    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa Initialized");
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa SX1278 Initialized");
 }
 
 void LoRa_RunFrame() {
@@ -132,4 +132,4 @@ void LoRa_RunFrame() {
     }
 }
 
-#endif // PLATFORM_ESPIDF - ЭТО В САМЫЙ КОНЕЦ ФАЙЛА
+#endif
