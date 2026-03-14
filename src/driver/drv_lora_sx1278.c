@@ -1,42 +1,73 @@
 #include "../new_common.h"
 #include "../new_pins.h"
-#include "../new_cfg.h"
 #include "../logging/logging.h"
 #include "drv_public.h"
-#include "drv_local.h"
 #include "hal/hal_pins.h"
 #include <string.h>
 
-// Правильные имена функций из drv_spi.c
-extern void DRV_SPI_Write(byte *data, int len);
-extern void DRV_SPI_Read(byte *data, int len);
+// Нативные инклуды для ESP32-C3
+#if PLATFORM_ESPIDF
+#include "driver/spi_master.h"
+spi_device_handle_t lora_spi;
+#endif
 
 #define LORA_NSS  7
 #define LORA_RST  10
 #define LORA_DIO0 3
 
-static const char *ENCRYPT_KEY = "1234567890ABCDEF";
+// Ключ шифрования
+static const uint8_t ENCRYPT_KEY[16] = {'1','2','3','4','5','6','7','8','9','0','A','B','C','D','E','F'};
 
 void LoRa_WriteReg(uint8_t addr, uint8_t val) {
-    uint8_t data[2];
-    data[0] = addr | 0x80;
-    data[1] = val;
+    uint8_t data[2] = { (uint8_t)(addr | 0x80), val };
+#if PLATFORM_ESPIDF
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length = 16;
+    t.tx_buffer = data;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    DRV_SPI_Write(data, 2);
+    spi_device_polling_transmit(lora_spi, &t);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
+#endif
 }
 
 uint8_t LoRa_ReadReg(uint8_t addr) {
-    uint8_t cmd = addr & 0x7F;
     uint8_t res = 0;
+    uint8_t cmd = addr & 0x7F;
+#if PLATFORM_ESPIDF
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length = 8;
+    t.tx_buffer = &cmd;
+    t.rxlength = 8;
+    t.rx_buffer = &res;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    DRV_SPI_Write(&cmd, 1);
-    DRV_SPI_Read(&res, 1);
+    spi_device_polling_transmit(lora_spi, &t);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
+#endif
     return res;
 }
 
 void LoRa_Init_Driver() {
+#if PLATFORM_ESPIDF
+    spi_bus_config_t buscfg = {
+        .miso_io_num = 5,
+        .mosi_io_num = 6,
+        .sclk_io_num = 4,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 32
+    };
+    spi_device_interface_config_t devcfg = {
+        .clock_speed_hz = 1*1000*1000,
+        .mode = 0,
+        .spics_io_num = -1,
+        .queue_size = 7
+    };
+    spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    spi_bus_add_device(SPI2_HOST, &devcfg, &lora_spi);
+#endif
+
     HAL_PIN_Setup_Output(LORA_NSS);
     HAL_PIN_Setup_Output(LORA_RST);
     HAL_PIN_Setup_Input(LORA_DIO0);
@@ -53,7 +84,6 @@ void LoRa_Init_Driver() {
     LoRa_WriteReg(0x1D, 0x72); 
     LoRa_WriteReg(0x1E, 0xC4); 
     LoRa_WriteReg(0x26, 0x08); 
-    
     LoRa_WriteReg(0x01, 0x85); 
     
     addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa SX1278 Initialized");
@@ -75,6 +105,8 @@ void LoRa_RunFrame() {
 
             uint8_t id = buffer[0];
             uint8_t pLen = buffer[1];
+            if (pLen > 64) pLen = 64;
+
             for (int i = 0; i < pLen; i++) {
                 buffer[i+2] ^= ENCRYPT_KEY[i % 16];
             }
@@ -84,7 +116,7 @@ void LoRa_RunFrame() {
 
             float vcc, temp;
             int ppm;
-            char smoke[8];
+            char smoke[16];
             if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
                 CHANNEL_Set(1, (int)(vcc * 10), 0);
                 CHANNEL_Set(2, (int)temp, 0);
