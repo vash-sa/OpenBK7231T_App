@@ -42,7 +42,8 @@ typedef struct driver_s {
 	bool bLoaded;
 } driver_t;
 
-
+void LoRa_Init_Driver();
+void LoRa_RunFrame();
 void TuyaMCU_RunEverySecond();
 void GirierMCU_RunEverySecond();
 
@@ -1487,6 +1488,18 @@ static driver_t g_drivers[] = {
 	NULL,                                    // onChannelChanged
 	NULL,                                    // onHassDiscovery
 	false,                                   // loaded
+	},
+#endif
+#if ENABLE_DRIVER_LORA
+	{ "LoRa",                // Driver Name
+	LoRa_Init_Driver,        // Init
+	NULL,                    // onEverySecond
+	NULL,                    // appendInformationToHTTPIndexPage
+	LoRa_RunFrame,           // runQuickTick (RunFrame)
+	NULL,                    // stopFunction
+	NULL,                    // onChannelChanged
+	NULL,                    // onHassDiscovery
+	false,                   // loaded
 	}
 #endif
 	//{ "", NULL, NULL, NULL, NULL, NULL, NULL, NULL, false },
