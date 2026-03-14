@@ -7,8 +7,7 @@
 #include "../new_cfg.h"
 #include "../logging/logging.h"
 #include "drv_public.h"
-// ИСПРАВЛЕНО: убрали hal/
-#include "hal_pins.h"
+#include "../hal/hal_pins.h"
 #include <string.h>
 
 // Специфичные инклуды для ESP32-C3
