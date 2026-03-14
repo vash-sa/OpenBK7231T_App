@@ -7,9 +7,9 @@
 #include "hal/hal_pins.h"
 #include <string.h>
 
-// Эти функции точно есть в OpenBK (см. drv_spi.h / drv_main.c)
-extern void SPI_Write(byte *data, int len);
-extern void SPI_Read(byte *data, int len);
+// Правильные имена функций из drv_spi.c
+extern void DRV_SPI_Write(byte *data, int len);
+extern void DRV_SPI_Read(byte *data, int len);
 
 #define LORA_NSS  7
 #define LORA_RST  10
@@ -22,7 +22,7 @@ void LoRa_WriteReg(uint8_t addr, uint8_t val) {
     data[0] = addr | 0x80;
     data[1] = val;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    SPI_Write(data, 2);
+    DRV_SPI_Write(data, 2);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
 }
 
@@ -30,8 +30,8 @@ uint8_t LoRa_ReadReg(uint8_t addr) {
     uint8_t cmd = addr & 0x7F;
     uint8_t res = 0;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
-    SPI_Write(&cmd, 1);
-    SPI_Read(&res, 1);
+    DRV_SPI_Write(&cmd, 1);
+    DRV_SPI_Read(&res, 1);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
     return res;
 }
