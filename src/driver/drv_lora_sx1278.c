@@ -8,6 +8,7 @@
 #include "drv_public.h"
 #include "drv_local.h"
 #include "../hal/hal_pins.h"
+#include "../mqtt/new_mqtt.h"
 
 #include <string.h>
 #include "driver/spi_master.h"
@@ -215,33 +216,39 @@ void LoRa_RunFrame() {
     char smoke[8];
 
     if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
-        char topic[64];
-        char valStr[16];
+        char topic[64], payload[192], dev_id[32];
         int is_smoke = (strcmp(smoke, "YES") == 0 ? 1 : 0);
-
-        // 1. Отправляем VCC (например: lora/2/vcc)
-        sprintf(topic, "lora/%d/vcc", id);
-        sprintf(valStr, "%.2f", vcc);
-        MQTT_Publish(topic, valStr, 0, 0);
-
-        // 2. Отправляем Temp (lora/2/temp)
-        sprintf(topic, "lora/%d/temp", id);
-        sprintf(valStr, "%.1f", temp);
-        MQTT_Publish(topic, valStr, 0, 0);
-
-        // 3. Отправляем Smoke (lora/2/smoke) - 1 если YES, 0 если NO
-        sprintf(topic, "lora/%d/smoke", id);
-        sprintf(valStr, "%d", is_smoke);
-        MQTT_Publish(topic, valStr, 0, 0);
-
-        // 4. Отправляем PPM (lora/2/ppm)
-        sprintf(topic, "lora/%d/ppm", id);
-        sprintf(valStr, "%d", ppm);
-        MQTT_Publish(topic, valStr, 0, 0);
         
-        // Для отладки в логах оставим:
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "MQTT Sent for Node %d", id);
+        // Уникальный ID устройства для HA
+        snprintf(dev_id, sizeof(dev_id), "lora_node_%d", id);
+
+        // 1. ПУБЛИКАЦИЯ ДАННЫХ (одной строкой для экономии трафика)
+        snprintf(topic, sizeof(topic), "lora/%s/state", dev_id);
+        snprintf(payload, sizeof(payload), "{\"vcc\":%.2f,\"temp\":%.1f,\"smoke\":%d,\"ppm\":%d}", 
+                 vcc, temp, is_smoke, ppm);
+        MQTT_Publish(topic, payload, 0, 0);
+
+        // 2. АВТО-РЕГИСТРАЦИЯ В HA (Discovery)
+        // Чтобы не слать это каждую секунду, можно слать только если id новый, 
+        // но для теста оставим так - HA сам отсеет дубликаты.
+        
+        // Регистрируем ТЕМПЕРАТУРУ
+        snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_T/config", dev_id);
+        snprintf(payload, sizeof(payload), 
+            "{\"name\":\"Temp\",\"stat_t\":\"lora/%s/state\",\"val_tpl\":\"{{value_json.temp}}\",\"unit_of_meas\":\"°C\",\"dev\":{\"ids\":[\"%s\"],\"name\":\"LoRa Node %d\",\"mf\":\"DIY\",\"mdl\":\"SX1278\"}}", 
+            dev_id, dev_id, id);
+        MQTT_Publish(topic, payload, 0, 0);
+
+        // Регистрируем ДЫМ (как binary_sensor)
+        snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_S/config", dev_id);
+        snprintf(payload, sizeof(payload), 
+            "{\"name\":\"Smoke\",\"stat_t\":\"lora/%s/state\",\"val_tpl\":\"{{value_json.smoke}}\",\"payload_on\":1,\"payload_off\":0,\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"%s\"]}}", 
+            dev_id, dev_id);
+        MQTT_Publish(topic, payload, 0, 0);
+        
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa Node %d proccessed", id);
     }
+}
 
 }
 
