@@ -214,15 +214,35 @@ void LoRa_RunFrame() {
     int ppm;
     char smoke[8];
 
-    if (sscanf((char*)&buffer[2],
-               "%f,%f,%[^,],%d",
-               &vcc,&temp,smoke,&ppm) == 4) {
+    if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
+        char topic[64];
+        char valStr[16];
+        int is_smoke = (strcmp(smoke, "YES") == 0 ? 1 : 0);
 
-        CHANNEL_Set(1,(int)(vcc*10),0);
-        CHANNEL_Set(2,(int)temp,0);
-        CHANNEL_Set(3,(strcmp(smoke,"YES")==0?1:0),0);
-        CHANNEL_Set(4,ppm,0);
+        // 1. Отправляем VCC (например: lora/2/vcc)
+        sprintf(topic, "lora/%d/vcc", id);
+        sprintf(valStr, "%.2f", vcc);
+        MQTT_Publish(topic, valStr, 0, 0);
+
+        // 2. Отправляем Temp (lora/2/temp)
+        sprintf(topic, "lora/%d/temp", id);
+        sprintf(valStr, "%.1f", temp);
+        MQTT_Publish(topic, valStr, 0, 0);
+
+        // 3. Отправляем Smoke (lora/2/smoke) - 1 если YES, 0 если NO
+        sprintf(topic, "lora/%d/smoke", id);
+        sprintf(valStr, "%d", is_smoke);
+        MQTT_Publish(topic, valStr, 0, 0);
+
+        // 4. Отправляем PPM (lora/2/ppm)
+        sprintf(topic, "lora/%d/ppm", id);
+        sprintf(valStr, "%d", ppm);
+        MQTT_Publish(topic, valStr, 0, 0);
+        
+        // Для отладки в логах оставим:
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "MQTT Sent for Node %d", id);
     }
+
 }
 
 #endif
