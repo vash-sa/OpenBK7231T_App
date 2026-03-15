@@ -250,6 +250,4 @@ void LoRa_RunFrame() {
     }
 }
 
-}
-
 #endif
