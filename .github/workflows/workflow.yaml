@@ -1,65 +1,125 @@
-build_idf:
-  name: Build IDF (OpenESP32C3 4M)
-  needs: refs
-  runs-on: ubuntu-24.04
+name: Build ESP32 4M
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
 
-    - name: Checkout ESP-IDF
-      uses: actions/checkout@v4
-      with:
-        repository: espressif/esp-idf
-        path: sdk/esp-idf
-        ref: v5.5.2
-        submodules: recursive
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  APP_NAME: ${{ github.event.repository.name }}
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        architecture: 'x64'
-        cache: 'pip'
+jobs:
+  refs:
+    name: Prepare CI Environment
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.refs.outputs.version }}
+      new_release: ${{ steps.refs.outputs.new_release }}
+    steps:
+      - name: Source checkout
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: cmake
-        version: 1.0
+      - name: Semantic Release
+        id: semantic
+        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Cache ESP-IDF toolchain
-      id: cache-toolchain
-      uses: actions/cache@v4
-      with:
-        path: ~/.espressif
-        key: esp-idf_toolchain_v5.5.2_python3.10
+      - name: Set outputs
+        id: refs
+        run: |
+          BRANCH=${GITHUB_REF#refs/*/}
+          BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+          VERSION=""
+          if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+            VERSION=${{ steps.semantic.outputs.new_release_version }}
+          else
+            VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+          fi
+          echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-    - name: Install toolchain (if cache miss)
-      if: steps.cache-toolchain.outputs.cache-hit != 'true'
-      run: |
-        cd sdk/esp-idf
-        ./install.sh
+  build_idf:
+    name: Build ESP32 4M Firmware
+    needs: refs
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - platform: OpenESP32C2
+            variant: 4M
+            version: v5.5.2
+            sdk: esp-idf
+          - platform: OpenESP32C3
+            variant: 4M
+            version: v5.5.2
+            sdk: esp-idf
+          - platform: OpenESP32
+            variant: 4M
+            version: v5.5.2
+            sdk: esp-idf
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set ESP-IDF environment
-      run: |
-        cd sdk/esp-idf
-        . ./export.sh
-        . ./add_path.sh
-        cd ../..
+      - name: Checkout ESP-IDF
+        uses: actions/checkout@v4
+        with:
+          repository: espressif/esp-idf
+          path: sdk/esp-idf
+          ref: ${{ matrix.version }}
+          submodules: recursive
 
-    - name: Build firmware
-      run: |
-        make APP_VERSION=${{ needs.refs.outputs.version }} \
-             APP_NAME=OpenESP32C3 \
-             VARIANT="4M" \
-             OpenESP32C3
+      - uses: actions/setup-python@v5
+        id: pysetup
+        with:
+          python-version: '3.10'
+          architecture: 'x64'
+          cache: 'pip'
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_OpenESP32C3_4M
-        path: |
-          output/${{ needs.refs.outputs.version }}/OpenESP32C3_4M_*.bin
-          output/${{ needs.refs.outputs.version }}/OpenESP32C3_4M_*.img
-        if-no-files-found: warn
+      - name: Install dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: cmake
+          version: 1.0
+
+      - name: Cache toolchain
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.espressif
+          key: ${{ matrix.sdk }}_toolchain_${{ matrix.version }}_${{ steps.pysetup.outputs.python-version }}
+
+      - name: Install toolchain if cache miss
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          cd sdk/${{ matrix.sdk }}
+          ./install.sh
+
+      - name: Set ESP-IDF environment and build
+        run: |
+          cd sdk/${{ matrix.sdk }}
+          . ./export.sh
+          cd ../..
+          make APP_VERSION=${{ needs.refs.outputs.version }} APP_NAME=${{ matrix.platform }} VARIANT="${{ matrix.variant }}" ${{ matrix.platform }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_${{ matrix.platform }}_${{ matrix.variant }}
+          path: |
+            output/${{ needs.refs.outputs.version }}/${{ matrix.platform }}_${{ matrix.variant }}_*.bin
+            output/${{ needs.refs.outputs.version }}/${{ matrix.platform }}_${{ matrix.variant }}_*.img
+          if-no-files-found: warn
