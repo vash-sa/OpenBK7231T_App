@@ -8,7 +8,7 @@
 #include "drv_public.h"
 #include "drv_local.h"
 #include "../hal/hal_pins.h"
-#include "../mqtt/new_mqtt.h" // Нужен для отправки в HA
+#include "../mqtt/new_mqtt.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -22,7 +22,7 @@ static spi_device_handle_t lora_spi;
 #define LORA_DIO0 3
 
 static const uint8_t ENCRYPT_KEY[16] = {'1','2','3','4','5','6','7','8','9','0','A','B','C','D','E','F'};
-static uint32_t g_registered_nodes = 0; // Битовая маска для отслеживания ID (до 32)
+static uint32_t g_registered_nodes = 0; 
 
 void LoRa_WriteReg(uint8_t addr, uint8_t val) {
     uint8_t data[2] = { (uint8_t)(addr | 0x80), val };
@@ -50,36 +50,31 @@ uint8_t LoRa_ReadReg(uint8_t addr) {
     return res;
 }
 
-// Функция регистрации устройства в Home Assistant
+// РЕГИСТРАЦИЯ УСТРОЙСТВА В HA
 void LoRa_SendDiscovery(int id) {
     char t[128]; // Буфер для топика
-    char p[512]; // Буфер для полезной нагрузки (payload)
-    
-    // 1. Температура
-    sprintf(t, "homeassistant/sensor/lora_%d_t/config", id);
-    sprintf(p, "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}}", 
-            id, id, id, id);
+    char p[512]; // Буфер для JSON (с запасом)
+
+    // Температура
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}}", id, id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // 2. Батарея
-    sprintf(t, "homeassistant/sensor/lora_%d_v/config", id);
-    sprintf(p, "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+    // Батарея
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // 3. Газ (PPM)
-    sprintf(t, "homeassistant/sensor/lora_%d_p/config", id);
-    sprintf(p, "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+    // Газ
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_p/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // 4. Дым (Binary Sensor)
-    sprintf(t, "homeassistant/binary_sensor/lora_%d_s/config", id);
-    sprintf(p, "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+    // Дым
+    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", id, id, id);
     MQTT_Publish(t, p, 0, 1);
 }
-
 
 void LoRa_Init_Driver() {
     spi_bus_config_t buscfg = { .miso_io_num = 5, .mosi_io_num = 6, .sclk_io_num = 4, .quadwp_io_num = -1, .quadhd_io_num = -1, .max_transfer_sz = 32 };
@@ -96,8 +91,8 @@ void LoRa_Init_Driver() {
     HAL_PIN_SetOutputValue(LORA_RST, 1);
     delay_ms(10);
 
-    LoRa_WriteReg(0x01, 0x80); // LoRa mode
-    LoRa_WriteReg(0x01, 0x85); // RX mode
+    LoRa_WriteReg(0x01, 0x80); 
+    LoRa_WriteReg(0x01, 0x85); 
     addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa Initialized");
 }
 
@@ -106,7 +101,7 @@ void LoRa_RunFrame() {
         uint8_t irq = LoRa_ReadReg(0x12);
         LoRa_WriteReg(0x12, irq);
 
-        if (irq & 0x40) { // Payload Ready
+        if (irq & 0x40) {
             uint8_t len = LoRa_ReadReg(0x13);
             uint8_t buffer[128];
             LoRa_WriteReg(0x0D, LoRa_ReadReg(0x10));
@@ -121,21 +116,21 @@ void LoRa_RunFrame() {
 
             float vcc, temp;
             int ppm;
-            char smoke[8];
+            char smoke[16];
             if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
-                // Если ID новый — регистрируем в HA
+                // Регистрируем, если еще не было такого ID
                 if (id < 32 && !(g_registered_nodes & (1 << id))) {
                     LoRa_SendDiscovery(id);
                     g_registered_nodes |= (1 << id);
                 }
 
-                // Отправка данных в топик устройства
-                char s_topic[32], s_payload[128];
-                sprintf(s_topic, "lora/%d/s", id);
-                sprintf(s_payload, "{\"v\":%.2f,\"t\":%.1f,\"s\":\"%s\",\"p\":%d}", vcc, temp, smoke, ppm);
+                // Шлем данные состояния в JSON
+                char s_topic[64], s_payload[256];
+                snprintf(s_topic, sizeof(s_topic), "lora/%d/s", id);
+                snprintf(s_payload, sizeof(s_payload), "{\"v\":%.2f,\"t\":%.1f,\"s\":\"%s\",\"p\":%d}", vcc, temp, smoke, ppm);
                 MQTT_Publish(s_topic, s_payload, 0, 0);
 
-                addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "Node %d updated", id);
+                addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "Node %d: T=%.1f V=%.2f Smoke=%s", id, temp, vcc, smoke);
             }
         }
     }
