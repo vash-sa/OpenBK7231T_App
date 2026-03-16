@@ -11,6 +11,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # ⚡ включаем Node.js 24
 
 jobs:
   refs:
