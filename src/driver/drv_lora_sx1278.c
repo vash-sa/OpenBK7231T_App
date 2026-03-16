@@ -52,29 +52,34 @@ uint8_t LoRa_ReadReg(uint8_t addr) {
 
 // Функция регистрации устройства в Home Assistant
 void LoRa_SendDiscovery(int id) {
-    char t[128], p[512];
-    const char *dev = ",\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}}";
-
-    // Температура
+    char t[128]; // Буфер для топика
+    char p[512]; // Буфер для полезной нагрузки (payload)
+    
+    // 1. Температура
     sprintf(t, "homeassistant/sensor/lora_%d_t/config", id);
-    sprintf(p, "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\"%s", id, id, id);
+    sprintf(p, "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}}", 
+            id, id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // Батарея
+    // 2. Батарея
     sprintf(t, "homeassistant/sensor/lora_%d_v/config", id);
-    sprintf(p, "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\"%s", id, id, id);
+    sprintf(p, "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // Газ
+    // 3. Газ (PPM)
     sprintf(t, "homeassistant/sensor/lora_%d_p/config", id);
-    sprintf(p, "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\"%s", id, id, id);
+    sprintf(p, "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id, id);
     MQTT_Publish(t, p, 0, 1);
 
-    // Дым (Бинарный сенсор)
+    // 4. Дым (Binary Sensor)
     sprintf(t, "homeassistant/binary_sensor/lora_%d_s/config", id);
-    sprintf(p, "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\"%s", id, id, id);
+    sprintf(p, "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id, id);
     MQTT_Publish(t, p, 0, 1);
 }
+
 
 void LoRa_Init_Driver() {
     spi_bus_config_t buscfg = { .miso_io_num = 5, .mosi_io_num = 6, .sclk_io_num = 4, .quadwp_io_num = -1, .quadhd_io_num = -1, .max_transfer_sz = 32 };
