@@ -215,39 +215,128 @@ void LoRa_RunFrame() {
     int ppm;
     char smoke[8];
 
-    if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
-        char topic[64], payload[192], dev_id[32];
-        int is_smoke = (strcmp(smoke, "YES") == 0 ? 1 : 0);
-        
-        // Уникальный ID устройства для HA
-        snprintf(dev_id, sizeof(dev_id), "lora_node_%d", id);
+    static uint32_t registered_nodes = 0;
 
-        // 1. ПУБЛИКАЦИЯ ДАННЫХ (одной строкой для экономии трафика)
-        snprintf(topic, sizeof(topic), "lora/%s/state", dev_id);
-        snprintf(payload, sizeof(payload), "{\"vcc\":%.2f,\"temp\":%.1f,\"smoke\":%d,\"ppm\":%d}", 
-                 vcc, temp, is_smoke, ppm);
-        MQTT_Publish(topic, payload, 0, 0);
+if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
 
-        // 2. АВТО-РЕГИСТРАЦИЯ В HA (Discovery)
-        // Чтобы не слать это каждую секунду, можно слать только если id новый, 
-        // но для теста оставим так - HA сам отсеет дубликаты.
-        
-        // Регистрируем ТЕМПЕРАТУРУ
-        snprintf(topic, sizeof(topic), "homeassistant/sensor/%s_T/config", dev_id);
-        snprintf(payload, sizeof(payload), 
-            "{\"name\":\"Temp\",\"stat_t\":\"lora/%s/state\",\"val_tpl\":\"{{value_json.temp}}\",\"unit_of_meas\":\"°C\",\"dev\":{\"ids\":[\"%s\"],\"name\":\"LoRa Node %d\",\"mf\":\"DIY\",\"mdl\":\"SX1278\"}}", 
-            dev_id, dev_id, id);
-        MQTT_Publish(topic, payload, 0, 0);
+    char topic[128];
+    char payload[256];
+    char dev_id[32];
 
-        // Регистрируем ДЫМ (как binary_sensor)
-        snprintf(topic, sizeof(topic), "homeassistant/binary_sensor/%s_S/config", dev_id);
-        snprintf(payload, sizeof(payload), 
-            "{\"name\":\"Smoke\",\"stat_t\":\"lora/%s/state\",\"val_tpl\":\"{{value_json.smoke}}\",\"payload_on\":1,\"payload_off\":0,\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"%s\"]}}", 
-            dev_id, dev_id);
-        MQTT_Publish(topic, payload, 0, 0);
-        
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa Node %d proccessed", id);
+    int is_smoke = (strcmp(smoke, "YES") == 0 ? 1 : 0);
+
+    snprintf(dev_id,sizeof(dev_id),"lora_node_%d",id);
+
+    /* ---------- STATE MESSAGE ---------- */
+
+    snprintf(topic,sizeof(topic),"lora/%s/state",dev_id);
+
+    snprintf(payload,sizeof(payload),
+    "{\"vcc\":%.2f,\"temp\":%.1f,\"smoke\":%d,\"ppm\":%d}",
+    vcc,temp,is_smoke,ppm);
+
+    MQTT_Publish(topic,payload,0,0);
+
+    /* ---------- DISCOVERY (ONLY ONCE) ---------- */
+
+    if(!(registered_nodes & (1 << id))) {
+
+        registered_nodes |= (1 << id);
+
+        /* TEMPERATURE */
+
+        snprintf(topic,sizeof(topic),
+        "homeassistant/sensor/%s_temp/config",dev_id);
+
+        snprintf(payload,sizeof(payload),
+        "{"
+        "\"name\":\"Temperature\","
+        "\"state_topic\":\"lora/%s/state\","
+        "\"value_template\":\"{{ value_json.temp }}\","
+        "\"unit_of_measurement\":\"°C\","
+        "\"device_class\":\"temperature\","
+        "\"unique_id\":\"%s_temp\","
+        "\"device\":{"
+            "\"identifiers\":[\"%s\"],"
+            "\"name\":\"LoRa Node %d\","
+            "\"manufacturer\":\"DIY\","
+            "\"model\":\"SX1278\""
+        "}"
+        "}",
+        dev_id,dev_id,dev_id,id);
+
+        MQTT_Publish(topic,payload,0,1);
+
+        /* BATTERY */
+
+        snprintf(topic,sizeof(topic),
+        "homeassistant/sensor/%s_battery/config",dev_id);
+
+        snprintf(payload,sizeof(payload),
+        "{"
+        "\"name\":\"Battery\","
+        "\"state_topic\":\"lora/%s/state\","
+        "\"value_template\":\"{{ value_json.vcc }}\","
+        "\"unit_of_measurement\":\"V\","
+        "\"device_class\":\"voltage\","
+        "\"unique_id\":\"%s_battery\","
+        "\"device\":{"
+        "\"identifiers\":[\"%s\"]"
+        "}"
+        "}",
+        dev_id,dev_id,dev_id);
+
+        MQTT_Publish(topic,payload,0,1);
+
+        /* PPM */
+
+        snprintf(topic,sizeof(topic),
+        "homeassistant/sensor/%s_ppm/config",dev_id);
+
+        snprintf(payload,sizeof(payload),
+        "{"
+        "\"name\":\"Smoke PPM\","
+        "\"state_topic\":\"lora/%s/state\","
+        "\"value_template\":\"{{ value_json.ppm }}\","
+        "\"unit_of_measurement\":\"ppm\","
+        "\"unique_id\":\"%s_ppm\","
+        "\"device\":{"
+        "\"identifiers\":[\"%s\"]"
+        "}"
+        "}",
+        dev_id,dev_id,dev_id);
+
+        MQTT_Publish(topic,payload,0,1);
+
+        /* SMOKE ALARM */
+
+        snprintf(topic,sizeof(topic),
+        "homeassistant/binary_sensor/%s_smoke/config",dev_id);
+
+        snprintf(payload,sizeof(payload),
+        "{"
+        "\"name\":\"Smoke Alarm\","
+        "\"state_topic\":\"lora/%s/state\","
+        "\"value_template\":\"{{ 'ON' if value_json.smoke==1 else 'OFF' }}\","
+        "\"payload_on\":\"ON\","
+        "\"payload_off\":\"OFF\","
+        "\"device_class\":\"smoke\","
+        "\"unique_id\":\"%s_smoke\","
+        "\"device\":{"
+        "\"identifiers\":[\"%s\"]"
+        "}"
+        "}",
+        dev_id,dev_id,dev_id);
+
+        MQTT_Publish(topic,payload,0,1);
+
+        addLogAdv(LOG_INFO,LOG_FEATURE_DRV,
+        "LoRa Node %d registered in HA",id);
     }
+
+    addLogAdv(LOG_INFO,LOG_FEATURE_DRV,
+    "LoRa Node %d processed",id);
+}
 }
 
 #endif
