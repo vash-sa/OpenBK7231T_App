@@ -49,30 +49,30 @@ static const uint8_t ENCRYPT_KEY[16] =
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[64];
-    char p[320]; // Увеличен буфер для длинного JSON
+    char p[256]; 
 
-    // 1. Температура
+    // 1. Температура: 2 вхождения %d в строке p -> 2 аргумента id
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}}", 
-            id, id, id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 2. Батарея
+    // 2. Батарея: 2 вхождения %d в строке p -> 2 аргумента id
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
     snprintf(p, sizeof(p), "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 3. Газ
+    // 3. Газ: 2 вхождения %d в строке p -> 2 аргумента id
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_p/config", id);
     snprintf(p, sizeof(p), "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 4. Дым (Бинарный сенсор)
+    // 4. Дым: 2 вхождения %d в строке p -> 2 аргумента id
     snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
     snprintf(p, sizeof(p), "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id, id);
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
 #endif
