@@ -49,45 +49,37 @@ static const uint8_t ENCRYPT_KEY[16] =
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[128];
-    char p[512]; // Увеличим буфер для длинного JSON
+    char p[512];
 
-    // 1. Конфиг ТЕМПЕРАТУРЫ
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_node_%d_t/config", id);
+    // 1. Температура. Добавляем "/" в начало топика t!
+    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_t/config", id);
     snprintf(p, sizeof(p), 
         "{"
-            "\"name\":\"Temperature\","        // Имя внутри карточки
-            "\"stat_t\":\"lora/%d/s\","
+            "\"name\":\"Temperature\","
+            "\"stat_t\":\"esp32/lora/%d/s/get\"," // Полный путь из логов!
             "\"val_tpl\":\"{{value_json.t}}\","
             "\"unit_of_meas\":\"°C\","
             "\"dev_cla\":\"temperature\","
-            "\"uniq_id\":\"lora_device_%d_temp\"," // Уникальный ID сущности
-            "\"dev\":{"
-                "\"ids\":[\"lora_unique_id_%d\"]," // Свой ID устройства (ОТДЕЛЬНАЯ КАРТОЧКА)
-                "\"name\":\"LoRa Node %d\","       // Заголовок карточки
-                "\"mf\":\"DIY\","
-                "\"mdl\":\"LoRa Sensor Node\""
-            "}"
-        "}", 
-        id, id, id, id);
+            "\"uniq_id\":\"lora_%d_t\","
+            "\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}"
+        "}", id, id, id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 2. Конфиг БАТАРЕИ (в ту же карточку)
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_node_%d_v/config", id);
+    // 2. Батарея. Снова "/" в начале топика t!
+    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_v/config", id);
     snprintf(p, sizeof(p), 
         "{"
             "\"name\":\"Battery\","
-            "\"stat_t\":\"lora/%d/s\","
+            "\"stat_t\":\"esp32/lora/%d/s/get\"," // Полный путь из логов!
             "\"val_tpl\":\"{{value_json.v}}\","
             "\"unit_of_meas\":\"V\","
             "\"dev_cla\":\"voltage\","
-            "\"uniq_id\":\"lora_device_%d_volt\","
-            "\"dev\":{"
-                "\"ids\":[\"lora_unique_id_%d\"]" // Тот же ID, что и выше — объединит их
-            "}"
-        "}", 
-        id, id, id);
+            "\"uniq_id\":\"lora_%d_v\","
+            "\"dev\":{\"ids\":[\"lora_%d\"]}" // ID тот же для связки в одну карточку
+        "}", id, id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
+
 #endif
 
 // --- Низкоуровневые функции SPI ---
