@@ -49,30 +49,13 @@ static const uint8_t ENCRYPT_KEY[16] =
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[128], p[512];
-
-    // 1. ТОПИК КОНФИГА: Слэш "/" в начале — это ПРИНУДИТЕЛЬНЫЙ выход в корень брокера.
-    // Это заставит пакет лечь в homeassistant/, а не в fire/homeassistant/
-    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_t/config", id);
-    
-    // 2. JSON: Указываем HA, что данные нужно брать из твоей "матрешки" fire/.../get
-    // Блок "dev" с уникальным "ids" создаст ОТДЕЛЬНУЮ карточку, как у Zigbee.
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
     snprintf(p, sizeof(p), 
-        "{"
-            "\"name\":\"Temp\","
-            "\"stat_t\":\"fire/lora/%d/s/get\"," 
-            "\"val_tpl\":\"{{value_json.t}}\","
-            "\"unit_of_meas\":\"°C\","
-            "\"dev_cla\":\"temperature\","
-            "\"uniq_id\":\"l_node_%d_t\","
-            "\"dev\":{"
-                "\"ids\":[\"lora_standalone_%d\"]," 
-                "\"name\":\"LoRa Node %d\","
-                "\"mf\":\"DIY\",\"mdl\":\"SX1278\""
-            "}"
-        "}", id, id, id, id);
-    
-    // Используем стандартную функцию со слэшем в топике — это НЕ вешает MQTT.
-    MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
+        "{\"name\":\"Temp\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"uniq_id\":\"l_%d_t\",\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"LoRa Node %d\"}}", 
+        id, id, id, id);
+
+    // "" вторым аргументом отключает системный префикс канала
+    MQTT_Publish(t, "", p, 3); 
 }
 
 #endif
@@ -186,16 +169,12 @@ void LoRa_RunFrame() {
         // Регистрация карточки (улетит в корень из-за слэша в функции выше)
         LoRa_SendDiscovery(id);
 
-        // Отправка ДАННЫХ: шлем стандартно в lora/%d/s.
-        // Функция сама добавит префикс fire/ и хвост /get, 
-        // что в точности совпадет с "stat_t" из конфига выше.
-        char state_topic[64];
-        snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
-
-        char state_payload[128];
+        char state_topic[64], state_payload[128];
+        snprintf(state_topic, sizeof(state_topic), "lora/%d", id);
         snprintf(state_payload, sizeof(state_payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
-
-        MQTT_PublishMain_StringString(state_topic, state_payload, 0);
+    
+        // Шлем RAW в корень lora/3
+        MQTT_Publish(state_topic, "", state_payload, 2); 
     }
 #endif
             }
