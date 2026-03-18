@@ -49,36 +49,33 @@ static const uint8_t ENCRYPT_KEY[16] =
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[128];
-    char p[512];
+    char p[512]; 
 
-    // 1. Температура. Добавляем "/" в начало топика t!
-    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_t/config", id);
+    // 1. ТОПИК: Пусть шлет как умеет (в fire/homeassistant/.../get)
+    // Раз OBK так хочет — не будем ему мешать, HA всё равно увидит.
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
+
+    // 2. JSON: А вот тут секрет Zigbee2MQTT
     snprintf(p, sizeof(p), 
         "{"
             "\"name\":\"Temperature\","
-            "\"stat_t\":\"esp32/lora/%d/s/get\"," // Полный путь из логов!
+            "\"stat_t\":\"fire/lora/%d/s/get\"," // СТРОГО ПО ТВОЕМУ СКРИНУ
             "\"val_tpl\":\"{{value_json.t}}\","
             "\"unit_of_meas\":\"°C\","
             "\"dev_cla\":\"temperature\","
-            "\"uniq_id\":\"lora_%d_t\","
-            "\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Node %d\"}"
+            "\"uniq_id\":\"l_node_%d_t\","
+            "\"dev\":{"
+                "\"ids\":[\"lora_standalone_%d\"]," // КЛЮЧЕВОЕ: Это создаст ОТДЕЛЬНУЮ карточку
+                "\"name\":\"LoRa Sensor Node %d\"," // Название новой карточки
+                "\"mf\":\"DIY\","
+                "\"mdl\":\"SX1278\""
+            "}"
         "}", id, id, id, id);
-    MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 2. Батарея. Снова "/" в начале топика t!
-    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_v/config", id);
-    snprintf(p, sizeof(p), 
-        "{"
-            "\"name\":\"Battery\","
-            "\"stat_t\":\"esp32/lora/%d/s/get\"," // Полный путь из логов!
-            "\"val_tpl\":\"{{value_json.v}}\","
-            "\"unit_of_meas\":\"V\","
-            "\"dev_cla\":\"voltage\","
-            "\"uniq_id\":\"lora_%d_v\","
-            "\"dev\":{\"ids\":[\"lora_%d\"]}" // ID тот же для связки в одну карточку
-        "}", id, id, id);
+    // Шлем стандартной функцией, которая у тебя не виснет
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
+
 
 #endif
 
