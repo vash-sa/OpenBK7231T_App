@@ -55,7 +55,7 @@ void LoRa_SendDiscovery(int id) {
         id, id, id, id);
 
     // "" вторым аргументом отключает системный префикс канала
-    MQTT_Publish(t, "", p, 3); 
+   MQTT_Publish("", t, p, 3); 
 }
 
 #endif
@@ -169,12 +169,13 @@ void LoRa_RunFrame() {
         // Регистрация карточки (улетит в корень из-за слэша в функции выше)
         LoRa_SendDiscovery(id);
 
-        char state_topic[64], state_payload[128];
-        snprintf(state_topic, sizeof(state_topic), "lora/%d", id);
+        char state_topic[64];
+        snprintf(state_topic, sizeof(state_topic), "lora/%d", id);    
+        char state_payload[128];
         snprintf(state_payload, sizeof(state_payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
     
-        // Шлем RAW в корень lora/3
-        MQTT_Publish(state_topic, "", state_payload, 2); 
+        // Шлем RAW (флаг 2), чтобы данные упали в чистый lora/3, как указано в конфиге
+        MQTT_Publish("", state_topic, state_payload, 2); 
     }
 #endif
             }
