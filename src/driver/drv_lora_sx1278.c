@@ -45,46 +45,45 @@ static spi_device_handle_t lora_spi;
 static const uint8_t ENCRYPT_KEY[16] =
 {'1','2','3','4','5','6','7','8','9','0','A','B','C','D','E','F'};
 
-// --- MQTT Discovery для Home Assistant ---
+// --- MQTT Discovery для Home Assistant (Исправленная версия БЕЗ ОШИБОК) ---
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[128];
-    char p[512]; // Увеличил размер буфера, так как JSON стал длиннее
+    char p[512];
+    char final_p[512];
 
-    // Общий блок устройства (device), чтобы датчики группировались в одну карточку для каждого ID
+    // Шаблон устройства
     const char *device_json = ",\"dev\":{\"ids\":[\"lora_node_%d\"],\"name\":\"LoRa Node %d\",\"model\":\"SX127x Sensor\",\"mf\":\"OpenBK\"}";
 
-    // 1. Температура
+    // 1. Температура (3 вхождения %d/s в основном JSON + 2 вхождения в device_json)
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
     snprintf(p, sizeof(p), 
         "{\"name\":\"Temperature\",\"uniq_id\":\"lora_%d_t\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\"%s}", 
-        id, id, id, device_json);
-    // Подставляем ID в блок device_json
-    char final_p[512];
+        id, id, device_json);
     snprintf(final_p, sizeof(final_p), p, id, id);
     MQTT_PublishMain_StringString(t, final_p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 2. Батарея (Вольтаж)
+    // 2. Батарея
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
     snprintf(p, sizeof(p), 
         "{\"name\":\"Battery\",\"uniq_id\":\"lora_%d_v\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\"%s}", 
-        id, id, id, device_json);
+        id, id, device_json);
     snprintf(final_p, sizeof(final_p), p, id, id);
     MQTT_PublishMain_StringString(t, final_p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 3. Газ (PPM)
+    // 3. Газ
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_p/config", id);
     snprintf(p, sizeof(p), 
         "{\"name\":\"Gas Concentration\",\"uniq_id\":\"lora_%d_p\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\"%s}", 
-        id, id, id, device_json);
+        id, id, device_json);
     snprintf(final_p, sizeof(final_p), p, id, id);
     MQTT_PublishMain_StringString(t, final_p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 4. Бинарный датчик дыма
+    // 4. Дым (binary_sensor)
     snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
     snprintf(p, sizeof(p), 
         "{\"name\":\"Smoke Status\",\"uniq_id\":\"lora_%d_s\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\"%s}", 
-        id, id, id, device_json);
+        id, id, device_json);
     snprintf(final_p, sizeof(final_p), p, id, id);
     MQTT_PublishMain_StringString(t, final_p, OBK_PUBLISH_FLAG_RETAIN);
 }
