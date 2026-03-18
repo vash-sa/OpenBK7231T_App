@@ -48,31 +48,44 @@ static const uint8_t ENCRYPT_KEY[16] =
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
-    char t[64];
-    char p[256]; 
+    char t[128];
+    char p[512]; // Увеличим буфер для длинного JSON
 
-    // 1. Температура: 2 вхождения %d в строке p -> 2 аргумента id
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id);
+    // 1. Конфиг ТЕМПЕРАТУРЫ
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_node_%d_t/config", id);
+    snprintf(p, sizeof(p), 
+        "{"
+            "\"name\":\"Temperature\","        // Имя внутри карточки
+            "\"stat_t\":\"lora/%d/s\","
+            "\"val_tpl\":\"{{value_json.t}}\","
+            "\"unit_of_meas\":\"°C\","
+            "\"dev_cla\":\"temperature\","
+            "\"uniq_id\":\"lora_device_%d_temp\"," // Уникальный ID сущности
+            "\"dev\":{"
+                "\"ids\":[\"lora_unique_id_%d\"]," // Свой ID устройства (ОТДЕЛЬНАЯ КАРТОЧКА)
+                "\"name\":\"LoRa Node %d\","       // Заголовок карточки
+                "\"mf\":\"DIY\","
+                "\"mdl\":\"LoRa Sensor Node\""
+            "}"
+        "}", 
+        id, id, id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // 2. Батарея: 2 вхождения %d в строке p -> 2 аргумента id
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id);
-    MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
-
-    // 3. Газ: 2 вхождения %d в строке p -> 2 аргумента id
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_p/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id);
-    MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
-
-    // 4. Дым: 2 вхождения %d в строке p -> 2 аргумента id
-    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
-            id, id);
+    // 2. Конфиг БАТАРЕИ (в ту же карточку)
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_node_%d_v/config", id);
+    snprintf(p, sizeof(p), 
+        "{"
+            "\"name\":\"Battery\","
+            "\"stat_t\":\"lora/%d/s\","
+            "\"val_tpl\":\"{{value_json.v}}\","
+            "\"unit_of_meas\":\"V\","
+            "\"dev_cla\":\"voltage\","
+            "\"uniq_id\":\"lora_device_%d_volt\","
+            "\"dev\":{"
+                "\"ids\":[\"lora_unique_id_%d\"]" // Тот же ID, что и выше — объединит их
+            "}"
+        "}", 
+        id, id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
 #endif
@@ -190,19 +203,22 @@ void LoRa_RunFrame() {
                 //CHANNEL_Set(4, ppm, 0);
 
 #if ENABLE_MQTT
-                // 2. Отправка Discovery (регистрация карточек)
-                LoRa_SendDiscovery(id);
+    // 1. Регистрация карточки (вызывай один раз при получении новой ноды)
+    LoRa_SendDiscovery(id);
 
-                // 3. Отправка данных в формате JSON
-                char state_topic[64];
-                char state_payload[128];
-                snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
-                snprintf(state_payload, sizeof(state_payload), 
-                    "{\"v\":%.2f,\"t\":%.1f,\"s\":\"%s\",\"p\":%d}", 
-                    vcc, temp, smoke, ppm);
-                
-                // Публикация без флага Retain для данных (чтобы не спамить базу HA)
-                MQTT_PublishMain_StringString(state_topic, state_payload, 0);
+    // 2. Подготовка топика данных (должен В ТОЧНОСТИ совпадать с "stat_t" из твоего конфига)
+    char state_topic[64];
+    snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
+
+    // 3. Формируем JSON с ключами "t" (температура) и "v" (батарея)
+    // Эти ключи должны совпадать с тем, что ты написал в "val_tpl" (value_json.t и value_json.v)
+    char state_payload[128];
+    snprintf(state_payload, sizeof(state_payload), 
+             "{\"t\":%.1f,\"v\":%.2f}", 
+             temp, vcc); // Берем значения из твоего парсинга
+
+    // 4. Пуляем в MQTT. Retain = 0, чтобы не забивать брокер старьем.
+    MQTT_PublishMain_StringString(state_topic, state_payload, 0);
 #endif
             }
         }
