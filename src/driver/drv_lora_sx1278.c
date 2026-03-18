@@ -45,65 +45,43 @@ static spi_device_handle_t lora_spi;
 static const uint8_t ENCRYPT_KEY[16] =
 {'1','2','3','4','5','6','7','8','9','0','A','B','C','D','E','F'};
 
+// --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
-static bool g_lora_discovered[256] = {0};
-
 void LoRa_SendDiscovery(int id) {
-    if (g_lora_discovered[id]) return;
-    g_lora_discovered[id] = true;
+    char t[64];
+    char p[256]; 
 
-    char t[128];
-    char p[512];
-    char avail_topic[64];
-
-    snprintf(avail_topic, sizeof(avail_topic), "lora/%d/online", id);
-
-    // TEMPERATURE
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_temp/config", id);
-    snprintf(p, sizeof(p),
-        "{\"name\":\"Temperature\",\"uniq_id\":\"lora_%d_temp\",\"stat_t\":\"lora/%d/state\","
-        "\"val_tpl\":\"{{ value_json.temperature }}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\","
-        "\"stat_cla\":\"measurement\",\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\","
-        "\"dev\":{\"ids\":[\"lora_%d\"],\"name\":\"LoRa Sensor %d\",\"mdl\":\"LoRa MultiSensor\",\"mf\":\"DIY\"}}",
-        id, id, avail_topic, id, id);
+    // 1. Температура: 2 вхождения %d в строке p -> 2 аргумента id
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // BATTERY
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_battery/config", id);
-    snprintf(p, sizeof(p),
-        "{\"name\":\"Battery\",\"uniq_id\":\"lora_%d_battery\",\"stat_t\":\"lora/%d/state\","
-        "\"val_tpl\":\"{{ value_json.battery }}\",\"unit_of_meas\":\"%%\",\"dev_cla\":\"battery\","
-        "\"stat_cla\":\"measurement\",\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\","
-        "\"dev\":{\"ids\":[\"lora_%d\"]}}",
-        id, id, avail_topic, id);
+    // 2. Батарея: 2 вхождения %d в строке p -> 2 аргумента id
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Batt\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // GAS
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_gas/config", id);
-    snprintf(p, sizeof(p),
-        "{\"name\":\"Gas\",\"uniq_id\":\"lora_%d_gas\",\"stat_t\":\"lora/%d/state\","
-        "\"val_tpl\":\"{{ value_json.gas }}\",\"unit_of_meas\":\"ppm\",\"stat_cla\":\"measurement\","
-        "\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\","
-        "\"dev\":{\"ids\":[\"lora_%d\"]}}",
-        id, id, avail_topic, id);
+    // 3. Газ: 2 вхождения %d в строке p -> 2 аргумента id
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_p/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Gas\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{value_json.p}}\",\"unit_of_meas\":\"ppm\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 
-    // SMOKE
-    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_smoke/config", id);
-    snprintf(p, sizeof(p),
-        "{\"name\":\"Smoke\",\"uniq_id\":\"lora_%d_smoke\",\"stat_t\":\"lora/%d/state\","
-        "\"val_tpl\":\"{{ 'ON' if value_json.smoke == 'YES' else 'OFF' }}\",\"dev_cla\":\"smoke\","
-        "\"avty_t\":\"%s\",\"pl_avail\":\"online\",\"pl_not_avail\":\"offline\","
-        "\"dev\":{\"ids\":[\"lora_%d\"]}}",
-        id, id, avail_topic, id);
+    // 4. Дым: 2 вхождения %d в строке p -> 2 аргумента id
+    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d/s\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"dev\":{\"ids\":[\"lora_%d\"]}}", 
+            id, id);
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
 #endif
 
-// SPI
+// --- Низкоуровневые функции SPI ---
 void LoRa_WriteReg(uint8_t addr, uint8_t val) {
     uint8_t data[2] = { (uint8_t)(addr | 0x80), val };
-    spi_transaction_t t = {0};
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
     t.length = 16;
     t.tx_buffer = data;
     HAL_PIN_SetOutputValue(LORA_NSS, 0);
@@ -114,7 +92,8 @@ void LoRa_WriteReg(uint8_t addr, uint8_t val) {
 uint8_t LoRa_ReadReg(uint8_t addr) {
     uint8_t tx[2] = { (uint8_t)(addr & 0x7F), 0 };
     uint8_t rx[2] = {0};
-    spi_transaction_t t = {0};
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
     t.length = 16;
     t.tx_buffer = tx;
     t.rx_buffer = rx;
@@ -131,7 +110,7 @@ void LoRa_SetFrequency(long freq) {
     LoRa_WriteReg(REG_FRF_LSB, (uint8_t)(frf));
 }
 
-// INIT
+// --- Инициализация драйвера ---
 void LoRa_Init_Driver() {
     spi_bus_config_t buscfg = {
         .miso_io_num = 5, .mosi_io_num = 6, .sclk_io_num = 4,
@@ -153,6 +132,9 @@ void LoRa_Init_Driver() {
     HAL_PIN_SetOutputValue(LORA_RST, 1);
     delay_ms(10);
 
+    uint8_t version = LoRa_ReadReg(REG_VERSION);
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "SX127x version: %02X", version);
+
     LoRa_WriteReg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
     LoRa_SetFrequency(433000000);
     LoRa_WriteReg(REG_FIFO_TX_BASE_ADDR, 0);
@@ -164,18 +146,20 @@ void LoRa_Init_Driver() {
     LoRa_WriteReg(REG_PAYLOAD_LENGTH, 0xFF);
     LoRa_WriteReg(REG_DIO_MAPPING_1, 0x00);
     LoRa_WriteReg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
+
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa RX started");
 }
 
-// LOOP
+// --- Основной цикл обработки кадров ---
 void LoRa_RunFrame() {
     if (HAL_PIN_ReadDigitalInput(LORA_DIO0)) {
         uint8_t irq = LoRa_ReadReg(REG_IRQ_FLAGS);
-        LoRa_WriteReg(REG_IRQ_FLAGS, irq);
+        LoRa_WriteReg(REG_IRQ_FLAGS, irq); // Сброс флагов прерывания
 
-        if (irq & 0x40) {
+        if (irq & 0x40) { // RX Done
             uint8_t len = LoRa_ReadReg(REG_RX_NB_BYTES);
             uint8_t buffer[128];
-
+            
             LoRa_WriteReg(REG_FIFO_ADDR_PTR, LoRa_ReadReg(REG_FIFO_RX_CURRENT));
             for(int i = 0; i < len && i < 127; i++) {
                 buffer[i] = LoRa_ReadReg(0x00);
@@ -185,36 +169,39 @@ void LoRa_RunFrame() {
             int pLen = buffer[1];
             if(pLen > 64) pLen = 64;
 
+            // Дешифровка XOR
             for (int i = 0; i < pLen; i++) {
                 buffer[i+2] ^= ENCRYPT_KEY[i % 16];
             }
             buffer[2 + pLen] = '\0';
 
+            addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa Node %d: %s", id, (char*)&buffer[2]);
+
             float vcc, temp;
             int ppm;
             char smoke[16];
-
+            
+            // Парсинг строки: "VCC,TEMP,SMOKE,PPM"
             if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
+                // 1. Обновление внутренних каналов OpenBeken
+                //CHANNEL_Set(1, (int)(vcc * 10), 0);
+                //CHANNEL_Set(2, (int)temp, 0);
+                //CHANNEL_Set(3, (strcmp(smoke, "YES") == 0 ? 1 : 0), 0);
+                //CHANNEL_Set(4, ppm, 0);
 
 #if ENABLE_MQTT
+                // 2. Отправка Discovery (регистрация карточек)
                 LoRa_SendDiscovery(id);
 
+                // 3. Отправка данных в формате JSON
                 char state_topic[64];
                 char state_payload[128];
-                char avail_topic[64];
-
-                snprintf(state_topic, sizeof(state_topic), "lora/%d/state", id);
-                snprintf(avail_topic, sizeof(avail_topic), "lora/%d/online", id);
-
-                int battery = (int)((vcc - 3.0f) * 100.0f / (4.2f - 3.0f));
-                if (battery < 0) battery = 0;
-                if (battery > 100) battery = 100;
-
-                snprintf(state_payload, sizeof(state_payload),
-                    "{\"temperature\":%.1f,\"battery\":%d,\"smoke\":\"%s\",\"gas\":%d}",
-                    temp, battery, smoke, ppm);
-
-                MQTT_PublishMain_StringString(avail_topic, "online", 0);
+                snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
+                snprintf(state_payload, sizeof(state_payload), 
+                    "{\"v\":%.2f,\"t\":%.1f,\"s\":\"%s\",\"p\":%d}", 
+                    vcc, temp, smoke, ppm);
+                
+                // Публикация без флага Retain для данных (чтобы не спамить базу HA)
                 MQTT_PublishMain_StringString(state_topic, state_payload, 0);
 #endif
             }
