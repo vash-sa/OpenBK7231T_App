@@ -55,7 +55,7 @@ void LoRa_SendDiscovery(int id) {
         id, id, id, id);
 
     // "" вторым аргументом отключает системный префикс канала
-   MQTT_Publish("", t, p, 3); 
+   MQTT_Publish(t, NULL, p, 3); 
 }
 
 #endif
@@ -175,7 +175,7 @@ void LoRa_RunFrame() {
         snprintf(state_payload, sizeof(state_payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
     
         // Шлем RAW (флаг 2), чтобы данные упали в чистый lora/3, как указано в конфиге
-        MQTT_Publish("", state_topic, state_payload, 2); 
+        MQTT_Publish(state_topic, NULL, state_payload, 2); 
     }
 #endif
             }
