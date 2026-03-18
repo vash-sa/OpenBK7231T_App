@@ -49,13 +49,13 @@ static const uint8_t ENCRYPT_KEY[16] =
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
     char t[128], p[512];
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t", id);
     snprintf(p, sizeof(p), 
         "{\"name\":\"Temp\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"uniq_id\":\"l_%d_t\",\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"LoRa Node %d\"}}", 
         id, id, id, id);
 
     // "" вторым аргументом отключает системный префикс канала
-   MQTT_Publish(t, NULL, p, 3); 
+   MQTT_Publish(t, "config", p, 3); 
 }
 
 #endif
@@ -169,13 +169,15 @@ void LoRa_RunFrame() {
         // Регистрация карточки (улетит в корень из-за слэша в функции выше)
         LoRa_SendDiscovery(id);
 
-        char state_topic[64];
-        snprintf(state_topic, sizeof(state_topic), "lora/%d", id);    
-        char state_payload[128];
-        snprintf(state_payload, sizeof(state_payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
+        char payload[128];
+        snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
     
-        // Шлем RAW (флаг 2), чтобы данные упали в чистый lora/3, как указано в конфиге
-        MQTT_Publish(state_topic, NULL, state_payload, 2); 
+        // Разделяем на "lora" и "ID", чтобы получить "lora/3" без лишних слэшей
+        char id_str[16];
+        snprintf(id_str, sizeof(id_str), "%d", id);
+    
+        // Флаг 2 (RAW) — отправка в корень lora/3 мимо префикса 3313/
+        MQTT_Publish("lora", id_str, payload, 2);
     }
 #endif
             }
