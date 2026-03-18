@@ -48,34 +48,32 @@ static const uint8_t ENCRYPT_KEY[16] =
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
-    char t[128];
-    char p[512]; 
+    char t[128], p[512];
 
-    // 1. ТОПИК: Пусть шлет как умеет (в fire/homeassistant/.../get)
-    // Раз OBK так хочет — не будем ему мешать, HA всё равно увидит.
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
-
-    // 2. JSON: А вот тут секрет Zigbee2MQTT
+    // 1. ТОПИК КОНФИГА: Слэш "/" в начале — это ПРИНУДИТЕЛЬНЫЙ выход в корень брокера.
+    // Это заставит пакет лечь в homeassistant/, а не в fire/homeassistant/
+    snprintf(t, sizeof(t), "/homeassistant/sensor/lora_%d_t/config", id);
+    
+    // 2. JSON: Указываем HA, что данные нужно брать из твоей "матрешки" fire/.../get
+    // Блок "dev" с уникальным "ids" создаст ОТДЕЛЬНУЮ карточку, как у Zigbee.
     snprintf(p, sizeof(p), 
         "{"
-            "\"name\":\"Temperature\","
-            "\"stat_t\":\"fire/lora/%d/s/get\"," // СТРОГО ПО ТВОЕМУ СКРИНУ
+            "\"name\":\"Temp\","
+            "\"stat_t\":\"fire/lora/%d/s/get\"," 
             "\"val_tpl\":\"{{value_json.t}}\","
             "\"unit_of_meas\":\"°C\","
             "\"dev_cla\":\"temperature\","
             "\"uniq_id\":\"l_node_%d_t\","
             "\"dev\":{"
-                "\"ids\":[\"lora_standalone_%d\"]," // КЛЮЧЕВОЕ: Это создаст ОТДЕЛЬНУЮ карточку
-                "\"name\":\"LoRa Sensor Node %d\"," // Название новой карточки
-                "\"mf\":\"DIY\","
-                "\"mdl\":\"SX1278\""
+                "\"ids\":[\"lora_standalone_%d\"]," 
+                "\"name\":\"LoRa Node %d\","
+                "\"mf\":\"DIY\",\"mdl\":\"SX1278\""
             "}"
         "}", id, id, id, id);
-
-    // Шлем стандартной функцией, которая у тебя не виснет
+    
+    // Используем стандартную функцию со слэшем в топике — это НЕ вешает MQTT.
     MQTT_PublishMain_StringString(t, p, OBK_PUBLISH_FLAG_RETAIN);
 }
-
 
 #endif
 
@@ -181,33 +179,24 @@ void LoRa_RunFrame() {
 
             float vcc, temp;
             int ppm;
-            char smoke[16];
-            
-            // Парсинг строки: "VCC,TEMP,SMOKE,PPM"
-            if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
-                // 1. Обновление внутренних каналов OpenBeken
-                //CHANNEL_Set(1, (int)(vcc * 10), 0);
-                //CHANNEL_Set(2, (int)temp, 0);
-                //CHANNEL_Set(3, (strcmp(smoke, "YES") == 0 ? 1 : 0), 0);
-                //CHANNEL_Set(4, ppm, 0);
+            char smoke[16];            
 
 #if ENABLE_MQTT
-    // 1. Регистрация карточки (вызывай один раз при получении новой ноды)
-    LoRa_SendDiscovery(id);
+    if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
+        // Регистрация карточки (улетит в корень из-за слэша в функции выше)
+        LoRa_SendDiscovery(id);
 
-    // 2. Подготовка топика данных (должен В ТОЧНОСТИ совпадать с "stat_t" из твоего конфига)
-    char state_topic[64];
-    snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
+        // Отправка ДАННЫХ: шлем стандартно в lora/%d/s.
+        // Функция сама добавит префикс fire/ и хвост /get, 
+        // что в точности совпадет с "stat_t" из конфига выше.
+        char state_topic[64];
+        snprintf(state_topic, sizeof(state_topic), "lora/%d/s", id);
 
-    // 3. Формируем JSON с ключами "t" (температура) и "v" (батарея)
-    // Эти ключи должны совпадать с тем, что ты написал в "val_tpl" (value_json.t и value_json.v)
-    char state_payload[128];
-    snprintf(state_payload, sizeof(state_payload), 
-             "{\"t\":%.1f,\"v\":%.2f}", 
-             temp, vcc); // Берем значения из твоего парсинга
+        char state_payload[128];
+        snprintf(state_payload, sizeof(state_payload), "{\"t\":%.1f,\"v\":%.2f}", temp, vcc);
 
-    // 4. Пуляем в MQTT. Retain = 0, чтобы не забивать брокер старьем.
-    MQTT_PublishMain_StringString(state_topic, state_payload, 0);
+        MQTT_PublishMain_StringString(state_topic, state_payload, 0);
+    }
 #endif
             }
         }
