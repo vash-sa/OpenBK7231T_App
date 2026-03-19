@@ -77,7 +77,7 @@ void LoRa_SendDiscovery(int id) {
 
     // 4. Газ CO
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g", id);
-    snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"gas\",\"uniq_id\":\"l_%d_g\",", id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\",", id, id);
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
