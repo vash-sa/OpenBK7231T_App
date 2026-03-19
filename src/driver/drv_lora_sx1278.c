@@ -202,19 +202,19 @@ void LoRa_RunFrame() {
             char smoke[16];            
 
 #if ENABLE_MQTT
-    if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
-        // Регистрация карточки (улетит в корень из-за слэша в функции выше)
+        if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
+        // 1. Регистрируем сенсоры в Home Assistant
         LoRa_SendDiscovery(id);
-
-        char payload[256]; // Увеличил размер для всех данных
-        // Формируем JSON: t-темп, v-вольтаж, s-дым, g-газ
+    
+        char payload[256]; 
+        // ВНИМАНИЕ: Используем переменные 'smoke' и 'ppm' (те, что заполнил sscanf выше)
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"v\":%.2f,\"s\":\"%s\",\"g\":%d}", 
-                 temp, vcc, smoke_status, gas_ppm);
+                 temp, vcc, smoke, ppm);
         
         char id_str[16];
         snprintf(id_str, sizeof(id_str), "%d", id);
         
-        // Отправляем в топик lora/ID
+        // Отправляем данные в топик lora/ID (например lora/4)
         MQTT_Publish("lora", id_str, payload, 2);
 
         /*char payload[128];
