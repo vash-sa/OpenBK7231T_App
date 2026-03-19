@@ -51,7 +51,7 @@ void LoRa_SendDiscovery(int id) {
     char t[128], p[600]; // Увеличил буфер для надежности
     
     // Общий кусок для группировки в одну карточку
-    const char* dev = "\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"LoRa Node %d\"}";
+    const char* dev = "\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"Fire Sensor %d\"}";
 
     // 1. Температура
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t", id);
@@ -63,7 +63,10 @@ void LoRa_SendDiscovery(int id) {
 
     // 2. Батарея
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Battery\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\",", id, id);
+    snprintf(p, sizeof(p), 
+    "{\"name\":\"Battery\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\","
+    "\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\",\"sug_dsp_prc\":1,", 
+    id, id);
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
