@@ -43,7 +43,7 @@ static spi_device_handle_t lora_spi;
 #define MODE_RX_CONTINUOUS      0x05
 
 static const uint8_t ENCRYPT_KEY[16] =
-{'1','2','3','4','5','6','7','8','9','0','A','B','C','D','E','F'};
+{'A','R','M','A','G','E','D','O','N','M','I','L','L','E','N','N'};
 
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
@@ -56,7 +56,6 @@ void LoRa_SendDiscovery(int id) {
     // 1. Температура
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t", id);
     snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\",", id, id);
-    strcat(p, ""); // Костыль для объединения, но лучше сразу в snprintf
     sprintf(p + strlen(p), dev, id, id); // Дописываем инфо об устройстве
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
@@ -65,7 +64,8 @@ void LoRa_SendDiscovery(int id) {
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v", id);
     snprintf(p, sizeof(p), 
     "{\"name\":\"Battery\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\","
-    "\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\",\"ic\":\"mdi:battery\",", 
+    "\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\",\"ic\":\"mdi:battery\","
+    "\"sug_dsp_prc\":1}", 
     id, id);
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
