@@ -55,7 +55,7 @@ void LoRa_SendDiscovery(int id) {
 
     // 1. Температура
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id); // Добавлен /config
-    snprintf(p, sizeof(p), "{\"name\":null,\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\",\"obj_id\":\"l_%d_t\",", id, id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Температура\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\",\"en_id\":true,", id, id);
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
