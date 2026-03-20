@@ -48,6 +48,46 @@ static const uint8_t ENCRYPT_KEY[16] =
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
+    char t[128], p[600];
+    
+    // Группировка: параметр "name" в dev — это заголовок всей карточки в HA
+    const char* dev = "\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"Пожарный датчик %d\"}";
+
+    // 1. Температура
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id); // Добавлен /config
+    snprintf(p, sizeof(p), "{\"name\":null,\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\",\"obj_id\":\"l_%d_t\",", id, id, id);
+    sprintf(p + strlen(p), dev, id, id);
+    strcat(p, "}");
+    MQTT_Publish(t, "config", p, 3);
+
+    // 2. Батарея
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
+    snprintf(p, sizeof(p), 
+        "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\","
+        "\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\","
+        "\"ic\":\"mdi:battery\",\"sug_dsp_prc\":1,\"obj_id\":\"l_%d_v\",", 
+        id, id, id);    
+    sprintf(p + strlen(p), dev, id, id);
+    strcat(p, "}");
+    MQTT_Publish(t, "config", p, 3);
+
+    // 3. Дым
+    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Дым\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"uniq_id\":\"l_%d_s\",\"obj_id\":\"l_%d_s\",", id, id, id);
+    sprintf(p + strlen(p), dev, id, id);
+    strcat(p, "}");
+    MQTT_Publish(t, "config", p, 3);
+
+    // 4. Газ CO
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\",\"obj_id\":\"l_%d_g\",", id, id, id);
+    sprintf(p + strlen(p), dev, id, id);
+    strcat(p, "}");
+    MQTT_Publish(t, "config", p, 3);
+}
+
+/*
+void LoRa_SendDiscovery(int id) {
     char t[128], p[600]; // Увеличил буфер для надежности
     
     // Общий кусок для группировки в одну карточку
@@ -84,19 +124,9 @@ void LoRa_SendDiscovery(int id) {
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
-}
-
-/*
-void LoRa_SendDiscovery(int id) {
-    char t[128], p[512];
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Temp\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"uniq_id\":\"l_%d_t\",\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"LoRa Node %d\"}}", 
-        id, id, id, id);
-
-    // "" вторым аргументом отключает системный префикс канала
-   MQTT_Publish(t, "config", p, 3); 
 }*/
+
+
 
 #endif
 
