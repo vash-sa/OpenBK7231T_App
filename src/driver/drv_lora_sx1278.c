@@ -80,7 +80,18 @@ void LoRa_SendDiscovery(int id) {
 
     // 4. Газ CO
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g/config", id);
-    snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\",\"obj_id\":\"l_%d_g\",", id, id, id);
+    //snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\",\"obj_id\":\"l_%d_g\",", id, id, id);
+    // Исправленный вариант для отображения цифр в Алисе
+snprintf(p, sizeof(p), 
+    "{\"name\":\"Концентрация CO\","        // Имя лучше на кириллице для Алисы
+    "\"stat_t\":\"lora/%d\","
+    "\"val_tpl\":\"{{value_json.g}}\","
+    "\"unit_of_meas\":\"ppm\","             // Единицы измерения важны
+    "\"dev_cla\":\"co2\","                  // МЕНЯЕМ НА co2 для отображения цифр
+    "\"uniq_id\":\"l_%d_g\","
+    "\"obj_id\":\"l_%d_g\",", 
+    id, id, id);
+
     sprintf(p + strlen(p), dev, id, id);
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
