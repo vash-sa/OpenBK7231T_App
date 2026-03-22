@@ -47,6 +47,7 @@ static const uint8_t ENCRYPT_KEY[16] =
 
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
+/*
 void LoRa_SendDiscovery(int id) {
     char t[128];
     static char p[1024]; // Увеличил буфер для длинного JSON
@@ -69,9 +70,9 @@ void LoRa_SendDiscovery(int id) {
         id, id, id, id, id, id);
 
     MQTT_Publish(t, "config", p, 3); 
-}
+}*/
 
-/*
+
 void LoRa_SendDiscovery(int id) {
     char t[128];
     static char p[800]; // static чтобы не висло, 800 - за глаза
@@ -93,7 +94,7 @@ void LoRa_SendDiscovery(int id) {
 
     // 3. ГАЗ CO
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g", id); // БЕЗ /config
-    snprintf(p, sizeof(p), "{\"name\":\"Угарный газ\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"co2\",\"uniq_id\":\"l_%d_g\"", id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Угарный газ\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\"", id, id);
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
 
@@ -102,7 +103,7 @@ void LoRa_SendDiscovery(int id) {
     snprintf(p, sizeof(p), "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\"", id, id);
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
-}*/
+}
 
 
 /*
