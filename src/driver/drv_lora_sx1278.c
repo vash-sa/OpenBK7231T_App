@@ -276,28 +276,24 @@ void LoRa_RunFrame() {
 
 #if ENABLE_MQTT
        // Парсим входящие данные (VCC, Temp, Smoke_Status, PPM)
-    if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
+   if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
         
-        // 1. Регистрируем структуру устройства (Discovery)
+        // Регистрируем структуру (Discovery)
         LoRa_SendDiscovery(id);
     
-        // 2. Формируем JSON-строку с данными
-        // Важно: ключи t, v, s, g должны совпадать с тем, что в Discovery (val_tpl)
-        char payload[128]; 
+        // 2. Готовим данные (Payload)
+        char payload[256]; 
         snprintf(payload, sizeof(payload), "{\"t\":%.1f,\"v\":%.2f,\"s\":\"%s\",\"g\":%d}", 
                  temp, vcc, smoke, ppm);
         
-        // 3. Формируем топик lora/ID (например, "lora/4")
-        char topic[32];
-        snprintf(topic, sizeof(topic), "lora/%d", id);
+        // 3. Готовим ID для канала (например, "4")
+        char id_str[16];
+        snprintf(id_str, sizeof(id_str), "%d", id);
         
-        // 4. Публикуем данные
-        // Если твоя функция MQTT_Publish принимает (топик, подтопик, данные, qos):
-        // MQTT_Publish("lora", id_str, payload, 2); // Вариант А
-        
-        // Если функция принимает полный путь (как обычно в MQTT):
-        MQTT_Publish(topic, payload, 2); // Вариант Б (стандартный)
-    }     
+        // 4. ПРАВИЛЬНЫЙ ВЫЗОВ для OpenBK:
+        // Аргументы: "lora" (база), id_str (канал), payload (JSON), 0 (флаги/Retain)
+        MQTT_Publish("lora", id_str, payload, 0); 
+    }
       /*  if (sscanf((char*)&buffer[2], "%f,%f,%[^,],%d", &vcc, &temp, smoke, &ppm) == 4) {
         // 1. Регистрируем сенсоры в Home Assistant
         LoRa_SendDiscovery(id);
