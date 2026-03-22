@@ -48,44 +48,36 @@ static const uint8_t ENCRYPT_KEY[16] =
 // --- MQTT Discovery для Home Assistant ---
 #if ENABLE_MQTT
 void LoRa_SendDiscovery(int id) {
-    char t[128], p[1024]; // Увеличил буфер, 600 может быть впритык
+    char t[128];
+    static char p[800]; // Сделал static (чтобы не висло) и чуть меньше (800 хватит за глаза)
     
-    // Единый блок устройства. ОЧЕНЬ ВАЖНО: ids и name должны быть пуля в пулю одинаковые везде.
-    // Добавил кавычки и убрал лишнее.
     const char* dev_json = ",\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"Пожарный датчик %d\"}}";
 
-    // 1. ДЫМ (Основа всей плитки)
+    // 1. ДЫМ
     snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s/config", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Дым\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"uniq_id\":\"l_%d_s\"", 
-        id, id);
-    sprintf(p + strlen(p), dev_json, id, id); // Приклеиваем хвост с dev
-    MQTT_Publish(t, "config", p, 3);
-
-    // 2. ТЕМПЕРАТУРА (Уйдет внутрь карточки дыма)
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Температура\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\"", 
-        id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Дым\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"uniq_id\":\"l_%d_s\"", id, id);
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
 
-    // 3. ГАЗ CO (Уйдет внутрь карточки дыма)
+    // 2. ТЕМПЕРАТУРА
+    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t/config", id);
+    snprintf(p, sizeof(p), "{\"name\":\"Температура\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\"", id, id);
+    sprintf(p + strlen(p), dev_json, id, id);
+    MQTT_Publish(t, "config", p, 3);
+
+    // 3. ГАЗ CO
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g/config", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Угарный газ\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"co2\",\"uniq_id\":\"l_%d_g\"", 
-        id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Угарный газ\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"co2\",\"uniq_id\":\"l_%d_g\"", id, id);
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
 
     // 4. БАТАРЕЯ
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v/config", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\"", 
-        id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\"", id, id);
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
 }
+
 /*
 void LoRa_SendDiscovery(int id) {
     char t[128], p[600];
@@ -125,49 +117,6 @@ void LoRa_SendDiscovery(int id) {
     strcat(p, "}");
     MQTT_Publish(t, "config", p, 3);
 }*/
-
-/*
-void LoRa_SendDiscovery(int id) {
-    char t[128], p[600]; // Увеличил буфер для надежности
-    
-    // Общий кусок для группировки в одну карточку
-    const char* dev = "\"dev\":{\"ids\":[\"l_node_%d\"],\"name\":\"Fire Sensor %d\"}";
-
-    // 1. Температура
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_t", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Temp\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.t}}\",\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"uniq_id\":\"l_%d_t\",", id, id);
-    sprintf(p + strlen(p), dev, id, id); // Дописываем инфо об устройстве
-    strcat(p, "}");
-    MQTT_Publish(t, "config", p, 3);
-
-    // 2. Батарея        
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v", id);
-    snprintf(p, sizeof(p), 
-        "{\"name\":\"Battery\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\","
-        "\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\","
-        "\"ic\":\"mdi:battery\",\"sug_dsp_prc\":1,", 
-        id, id);    
-    sprintf(p + strlen(p), dev, id, id); // Теперь dev допишется корректно
-    strcat(p, "}");
-    MQTT_Publish(t, "config", p, 3);
-
-    // 3. Дым (Binary Sensor - будет показывать "Обнаружено/Чисто")
-    snprintf(t, sizeof(t), "homeassistant/binary_sensor/lora_%d_s", id);
-    snprintf(p, sizeof(p), "{\"name\":\"Smoke\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{'ON' if value_json.s=='YES' else 'OFF'}}\",\"dev_cla\":\"smoke\",\"uniq_id\":\"l_%d_s\",", id, id);
-    sprintf(p + strlen(p), dev, id, id);
-    strcat(p, "}");
-    MQTT_Publish(t, "config", p, 3);
-
-    // 4. Газ CO
-    snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_g", id);
-    snprintf(p, sizeof(p), "{\"name\":\"CO\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.g}}\",\"unit_of_meas\":\"ppm\",\"dev_cla\":\"carbon_monoxide\",\"uniq_id\":\"l_%d_g\",", id, id);
-    sprintf(p + strlen(p), dev, id, id);
-    strcat(p, "}");
-    MQTT_Publish(t, "config", p, 3);
-}*/
-
-
-
 #endif
 
 // --- Низкоуровневые функции SPI ---
