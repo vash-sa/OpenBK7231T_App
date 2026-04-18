@@ -148,6 +148,7 @@ void LoRa_SendDiscovery(int id) {
 #endif
 
 // --- Низкоуровневые функции SPI ---
+/*
 void LoRa_WriteReg(uint8_t addr, uint8_t val) {
     uint8_t data[2] = { (uint8_t)(addr | 0x80), val };
     spi_transaction_t t;
@@ -171,6 +172,32 @@ uint8_t LoRa_ReadReg(uint8_t addr) {
     spi_device_polling_transmit(lora_spi, &t);
     HAL_PIN_SetOutputValue(LORA_NSS, 1);
     return rx[1];
+}*/
+
+void LoRa_WriteReg(uint8_t addr, uint8_t val) {
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    
+    t.flags = SPI_TRANS_USE_TXDATA;        // Позволяет не создавать массив, а слать данные прямо из структуры
+    t.length = 16;                         // 8 бит адрес + 8 бит данные
+    t.tx_data[0] = addr | 0x80;            // Устанавливаем бит записи
+    t.tx_data[1] = val;
+
+    // Пин NSS упадет и поднимется автоматически
+    spi_device_polling_transmit(lora_spi, &t);
+}
+uint8_t LoRa_ReadReg(uint8_t addr) {
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    
+    t.flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA;
+    t.length = 16;
+    t.tx_data[0] = addr & 0x7F;            // Бит чтения (0)
+    // tx_data[1] остается 0
+
+    spi_device_polling_transmit(lora_spi, &t);
+
+    return t.rx_data[1];                   // Результат во втором байте
 }
 
 void LoRa_SetFrequency(long freq) {
@@ -181,6 +208,7 @@ void LoRa_SetFrequency(long freq) {
 }
 
 // --- Инициализация драйвера ---
+/*
 void LoRa_Init_Driver() {
     spi_bus_config_t buscfg = {
         .miso_io_num = 5, .mosi_io_num = 6, .sclk_io_num = 4,
@@ -218,7 +246,60 @@ void LoRa_Init_Driver() {
     LoRa_WriteReg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
 
     addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa RX started");
+}*/
+
+void LoRa_Init_Driver() {
+    spi_bus_config_t buscfg = {
+        .miso_io_num = 5,
+        .mosi_io_num = 6,
+        .sclk_io_num = 4,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 32
+    };
+
+    spi_device_interface_config_t devcfg = {
+        .clock_speed_hz = 1000000,
+        .mode = 0,
+        .spics_io_num = LORA_NSS,  // <--- ТЕПЕРЬ ПИН 7 ТУТ. Драйвер сам будет его опускать.
+        .queue_size = 7,
+        .cs_ena_pretrans = 1,      // Даем чипу 1 такт подготовиться перед передачей
+        .cs_ena_posttrans = 1,     // Удерживаем CS чуть дольше после передачи
+    };
+
+    spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    spi_bus_add_device(SPI2_HOST, &devcfg, &lora_spi);
+
+    // HAL_PIN_Setup_Output(LORA_NSS); // <--- ЭТО УДАЛЯЕМ. Пин теперь под контролем SPI.
+    
+    HAL_PIN_Setup_Output(LORA_RST);
+    HAL_PIN_Setup_Input(LORA_DIO0);
+
+    // Сброс чипа
+    HAL_PIN_SetOutputValue(LORA_RST, 0);
+    delay_ms(10);
+    HAL_PIN_SetOutputValue(LORA_RST, 1);
+    delay_ms(10);
+
+    // Дальше настройка регистров идет без изменений...
+    uint8_t version = LoRa_ReadReg(REG_VERSION);
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "SX127x version: %02X", version);
+    
+    LoRa_WriteReg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
+    LoRa_SetFrequency(433000000);
+    LoRa_WriteReg(REG_FIFO_TX_BASE_ADDR, 0);
+    LoRa_WriteReg(REG_FIFO_RX_BASE_ADDR, 0);
+    LoRa_WriteReg(REG_LNA, 0x23);
+    LoRa_WriteReg(REG_MODEM_CONFIG_1, 0x72);
+    LoRa_WriteReg(REG_MODEM_CONFIG_2, 0xC4);
+    LoRa_WriteReg(REG_MODEM_CONFIG_3, 0x0C);
+    LoRa_WriteReg(REG_PAYLOAD_LENGTH, 0xFF);
+    LoRa_WriteReg(REG_DIO_MAPPING_1, 0x00);
+    LoRa_WriteReg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
+
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "LoRa RX started");
 }
+
 
 // --- Основной цикл обработки кадров ---
 void LoRa_RunFrame() {
