@@ -100,7 +100,9 @@ void LoRa_SendDiscovery(int id) {
 
     // 4. БАТАРЕЯ
     snprintf(t, sizeof(t), "homeassistant/sensor/lora_%d_v", id); // БЕЗ /config
-    snprintf(p, sizeof(p), "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\"", id, id);
+    //snprintf(p, sizeof(p), "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"uniq_id\":\"l_%d_v\"", id, id);
+    snprintf(p, sizeof(p), "{\"name\":\"Заряд\",\"stat_t\":\"lora/%d\",\"val_tpl\":\"{{value_json.v|round(1)}}\",\"unit_of_meas\":\"V\",\"dev_cla\":\"voltage\",\"ic\":\"mdi:battery\",\"uniq_id\":\"l_%d_v\"}", id, id);
+
     sprintf(p + strlen(p), dev_json, id, id);
     MQTT_Publish(t, "config", p, 3);
 }
