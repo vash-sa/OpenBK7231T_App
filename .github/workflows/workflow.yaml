@@ -22,10 +22,15 @@ jobs:
 
       - name: Build Firmware
         run: |
-          # Прописываем пути к компилятору для CMake
-          export CC=arm-none-eabi-gcc
-          export CXX=arm-none-eabi-g++
-          export ASM=arm-none-eabi-gcc
+          # Находим, где реально лежит компилятор
+          GCC_PATH=$(which arm-none-eabi-gcc)
+          GXX_PATH=$(which arm-none-eabi-g++)
           
-          # Запуск сборки
+          # Передаем полные пути в переменные окружения
+          export CC=$GCC_PATH
+          export CXX=$GXX_PATH
+          export ASM=$GCC_PATH
+          
+          # Запуск сборки с явным указанием путей для CMake
           make OpenLN882H
+
