@@ -426,9 +426,9 @@
 //#define ENABLE_DRIVER_IRREMOTEESP				1
 //#define ENABLE_DRIVER_TUYAMCU					1
 //#define ENABLE_DRIVER_TINYIR_NEC				1
-//#define ENABLE_DRIVER_AHT2X 1
-//#define ENABLE_DRIVER_BMP280 1
-//#define ENABLE_DRIVER_I2C 1
+#define ENABLE_DRIVER_AHT2X						  1
+#define ENABLE_I2C							        1
+#define ENABLE_DRIVER_BMP280             1
 
 #elif PLATFORM_ESPIDF
 
