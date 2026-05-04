@@ -22,12 +22,10 @@ jobs:
 
       - name: Build Firmware
         run: |
-          # Команда для сборки LN882H (убедитесь, что Makefile на месте)
+          # Прописываем пути к компилятору для CMake
+          export CC=arm-none-eabi-gcc
+          export CXX=arm-none-eabi-g++
+          export ASM=arm-none-eabi-gcc
+          
+          # Запуск сборки
           make OpenLN882H
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenBK_LN882H_Firmware
-          path: |
-            sdk/OpenLN882H/build/bin/*.bin
