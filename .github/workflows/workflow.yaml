@@ -60,9 +60,9 @@ jobs:
           submodules: recursive
 
       - name: Install ARM Toolchain
-        uses: alexa-vaneev/setup-arm-none-eabi-gcc@v1
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
-          release: '10.3-2021.10' # Эта версия стабильно собирает LN882H
+          release: '10.3-2021.10' # Та же версия, проверенная для LN882H
 
 
       - name: Install Build Tools
