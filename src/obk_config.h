@@ -406,7 +406,7 @@
 //#define ENABLE_TIME_DST						1
 #define ENABLE_DRIVER_BL0937					1
 #define ENABLE_DRIVER_BL0942					1
-#define ENABLE_DRIVER_LED 						1
+//#define ENABLE_DRIVER_LED 						1
 //#define ENABLE_DRIVER_WEMO						1
 //#define ENABLE_DRIVER_HUE						1
 //#define ENABLE_DRIVER_DHT						1
@@ -428,7 +428,7 @@
 //#define ENABLE_DRIVER_TINYIR_NEC				1
 #define ENABLE_DRIVER_AHT2X						  1
 #define ENABLE_I2C							        1
-#define ENABLE_DRIVER_BMP280             1
+//#define ENABLE_DRIVER_BMP280             1
 
 #elif PLATFORM_ESPIDF
 
