@@ -1,36 +1,88 @@
-name: Build OpenBK LN882H
-on: [push, pull_request, workflow_dispatch]
+name: Build LN882H Custom
+on:
+  push:
+    branches: - '**'
+  pull_request:
+    branches: - '**'
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  APP_NAME: ${{ github.event.repository.name }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - platform: OpenLN882H
-            variant: default
-            gcc: '10.3-2021.10'
-
+  refs:
+    name: Prepare CI Environment
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.refs.outputs.version }}
+      new_release: ${{ steps.refs.outputs.new_release }}
     steps:
-      - name: Checkout
+      - name: Source checkout
         uses: actions/checkout@v4
+      - name: Semantic Release
+        id: semantic
+        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set outputs
+        id: refs
+        run: |
+          BRANCH=${GITHUB_REF#refs/*/}
+          BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+          VERSION=""
+          if [ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]; then
+            VERSION=${{ steps.semantic.outputs.new_release_version }}
+          else
+            VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+          fi
+          echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+  build_ln882h:
+    name: Build LN882H Firmware
+    needs: refs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install ARM Toolchain
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        uses: emmanuel-martinez/install-arm-none-eabi-gcc@v1
         with:
           release: '10.3-2021.10'
 
-      - name: Build Firmware
+      - name: Install Build Tools
         run: |
-          # Находим, где реально лежит компилятор
-          GCC_PATH=$(which arm-none-eabi-gcc)
-          GXX_PATH=$(which arm-none-eabi-g++)
-          
-          # Передаем полные пути в переменные окружения
-          export CC=$GCC_PATH
-          export CXX=$GXX_PATH
-          export ASM=$GCC_PATH
-          
-          # Запуск сборки с явным указанием путей для CMake
-          make OpenLN882H
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build python3 python3-pip
 
+      - name: Build
+        run: |
+          # Команда сборки специально для платформы LN882H
+          make -j$(nproc) APP_VERSION=${{ needs.refs.outputs.version }} PLATFORM_LN882H=1
+
+      - name: Copy build artifacts to output
+        run: |
+          mkdir -p output/${{ needs.refs.outputs.version }}
+          # Собираем .bin файлы (для LN882H это обычно файлы прошивки)
+          cp *.bin output/${{ needs.refs.outputs.version }}/ || true
+          cp build/*.bin output/${{ needs.refs.outputs.version }}/ || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_LN882H
+          path: |
+            output/${{ needs.refs.outputs.version }}/*.bin
+          if-no-files-found: warn
