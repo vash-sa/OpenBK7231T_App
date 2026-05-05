@@ -40,9 +40,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}_LN882H_Build
-          path: |
-            *.bin
-            output/*.bin
-            apps/OpenBK7231T_App/output/*.bin
-            obj/LN882H/*.bin
+          path: "**/*.bin"
           if-no-files-found: error
+
