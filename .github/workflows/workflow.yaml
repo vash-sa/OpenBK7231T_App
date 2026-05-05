@@ -1,12 +1,10 @@
 name: Build App
 
+# --- ИЗМЕНЕНИЕ ---
+# Оставляем только workflow_dispatch. Пайплайн НЕ будет запускаться при push/pull_request.
+# Он будет ждать, пока вы нажмете кнопку "Run workflow" в интерфейсе GitHub.
 on:
-  push:
-    branches:
-      - '**'
-  pull_request:
-    branches:
-      - '**'
+  workflow_dispatch:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,11 +41,9 @@ jobs:
         id: refs
         run: |
           BRANCH=${GITHUB_REF#refs/*/}
-          echo "branch: ${BRANCH}"
           BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
           echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
 
-          # Определяем версию
           if [ "${{ steps.semantic.outputs.new_release_published }}" = "true" ]; then
             VERSION=${{ steps.semantic.outputs.new_release_version }}
           else
@@ -82,7 +78,7 @@ jobs:
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: ${{ matrix.gcc }}
-          path-env-var: ARM_NONE_EABI_GCC_PATH
+          path-env-var: ARM_NONE_EBI_GCC_PATH
 
       - name: Run make build
         run: |
@@ -91,43 +87,22 @@ jobs:
                VARIANT="${{ matrix.variant }}" \
                ${{ matrix.platform }}
 
-      - name: Save build assets as artifact
+      - name: Save build assets as artifact (Separate for each platform)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_${{ matrix.platform }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}
           path: |
-            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.bin
-            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.img
-            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.rbl
-            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.fls
-            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.ota.img
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/*
 
-  merge:
-    name: Merge Artifacts for Release
-    runs-on: ubuntu-22.04
-    needs: [refs, build]
-    # Запускается всегда, но финальный релиз (release) будет только если это main или alpha и есть новая версия
-    steps:
-      - name: Merge Artifacts into single archive
-        uses: actions/upload-artifact/merge@v4
-        with:
-          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}
-          delete-merged: true
 
   release:
-    name: Publish Release and Artifacts
+    name: Semantic Release Images and Artifacts
     runs-on: ubuntu-22.04
-    needs: [merge, refs]
+    needs: [build, refs]
     if: always() && needs.refs.outputs.new_release == 'true' && (github.ref == 'refs/heads/main' || github.ref_name == 'alpha')
     steps:
-      - name: Checkout repository for release commit
+      - name: Checkout repository for release commit (needed for semantic-release)
         uses: actions/checkout@v4
-
-      - name: Download Merged Artifacts (required for semantic-release plugin)
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}
-          path: output/${{ needs.refs.outputs.version }}
 
       - name: Run Semantic Release (Final)
         id: semantic_final
@@ -135,10 +110,6 @@ jobs:
         with:
           dry_run: false
           semantic_version: 21
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            conventional-changelog-conventionalcommits@7
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
