@@ -1,5 +1,4 @@
-name: Build OpenBK7231T_App
-
+name: Build App
 on:
   push:
     branches:
@@ -7,36 +6,55 @@ on:
   pull_request:
     branches:
       - '**'
-  workflow_dispatch:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   refs:
-    runs-on: ubuntu-latest
+    name: Prepare CI Environment
+    runs-on: ubuntu-22.04
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.refs.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Source checkout
         uses: actions/checkout@v4
-      - name: Get version
-        id: version
+      - name: Semantic Release
+        id: semantic
+        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set outputs
+        id: refs
         run: |
-          VERSION=$(grep -oP '(?<=#define SOFTWARE_VERSION ")([^"]+)' apps/OpenBK7231T_App/src/new_common.h)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          export BRANCH=${GITHUB_REF#refs/*/}
+          export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+          export VERSION=""
+          if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+            export VERSION=${{ steps.semantic.outputs.new_release_version }}
+          else
+            export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build:
+    name: Build MCU
     needs: refs
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # ОСТАВИЛ ТОЛЬКО ЭТИ ДВЕ
         platform: [ln882h, bl602]
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
