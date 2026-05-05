@@ -31,14 +31,11 @@ jobs:
 
       - name: Build LN882H Firmware
         run: |
-          # В LN882H обычно используется cmake/ninja или специфичный скрипт сборки
-          # Для OpenBeken (LN882H) команда обычно выглядит так:
+          # Замените на вашу команду сборки, если она отличается
           python3 .github/scripts/build_ln882h.py 
-          # Если вы используете стандартный Makefile проекта:
-          # make -j$(nproc) PLATFORM=LN882H
 
       - name: Upload Artifacts
-        uses: actions/artifacts-upload@v4
+        uses: actions/upload-artifact@v4
         with:
           name: OpenLN882H_firmware
           path: |
