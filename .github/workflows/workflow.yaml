@@ -1,36 +1,55 @@
-name: Build OpenLN882H
+name: Build OpenBK7231T_App
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  APP_NAME: ${{ github.event.repository.name }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
+  refs:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=#define SOFTWARE_VERSION ")([^"]+)' apps/OpenBK7231T_App/src/new_common.h)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build:
+    needs: refs
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ln882h, bl602]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install Arm GNU Toolchain
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
+      - name: Install ARM Toolchain
+        uses: emmanuel-martinez/install-arm-none-eabi-gcc@v1
         with:
           release: '10.3-2021.10'
-
-      - name: Install Python dependencies
+      - name: Build
         run: |
-          python3 -m pip install --upgrade pip
-          pip3 install setuptools wheeel
-
-      - name: Build Firmware
-        run: |
-          # Используем родной скрипт сборки проекта для LN882H
-          chmod +x platforms/ln882h/build.sh
-          ./platforms/ln882h/build.sh
-
-      - name: Upload Artifacts
+          python3 .github/scripts/build.py ${{ matrix.platform }}
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: OpenLN882H_Official_Build
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_${{ matrix.platform }}
           path: |
-            platforms/ln882h/sdk/ln882h/out/*.bin
-            output/*.bin
+            output/${{ needs.refs.outputs.version }}/*.bin
+          if-no-files-found: warn
