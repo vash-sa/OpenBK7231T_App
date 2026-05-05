@@ -45,10 +45,30 @@ jobs:
           release: '10.3-2021.10'
       - name: Build
         run: |
-          if [ "${{ matrix.platform }}" == "ln882h" ]; then
-            cd platforms/ln882h && chmod +x build.sh && ./build.sh
+          if [ "${{ matrix.platform }}" == "bk7231t" ]; then
+            python3 .github/scripts/build.py bk7231t
+          elif [ "${{ matrix.platform }}" == "bk7231n" ]; then
+            python3 .github/scripts/build.py bk7231n
+          elif [ "${{ matrix.platform }}" == "bk7231n_small" ]; then
+             python3 .github/scripts/build.py bk7231n_small
+          elif [ "${{ matrix.platform }}" == "w600" ]; then
+            cd platforms/w60x && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "w800" ]; then
+            cd platforms/w80x && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "xr809" ]; then
+            cd platforms/xr809 && chmod +x build.sh && ./build.sh
           elif [ "${{ matrix.platform }}" == "bl602" ]; then
             cd platforms/bl602 && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "ln882h" ]; then
+            cd platforms/ln882h && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "esp32" ]; then
+            cd platforms/esp32 && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "esp32c3" ]; then
+            cd platforms/esp32c3 && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "esp32s2" ]; then
+            cd platforms/esp32s2 && chmod +x build.sh && ./build.sh
+          elif [ "${{ matrix.platform }}" == "esp32s3" ]; then
+            cd platforms/esp32s3 && chmod +x build.sh && ./build.sh
           fi
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
