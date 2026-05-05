@@ -31,8 +31,8 @@ jobs:
 
       - name: Build LN882H Firmware
         run: |
-          # Замените на вашу команду сборки, если она отличается
-          python3 .github/scripts/build_ln882h.py 
+          # Команда сборки для LN882H в OpenBeken
+          make PLATFORM=LN882H -j$(nproc)
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -41,3 +41,4 @@ jobs:
           path: |
             *.bin
             output/*.bin
+            obj/LN882H/*.bin
