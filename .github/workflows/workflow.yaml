@@ -9,10 +9,13 @@ on:
       - '**'
   workflow_dispatch:
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  APP_NAME: ${{ github.event.repository.name }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,14 +34,15 @@ jobs:
 
       - name: Build LN882H Firmware
         run: |
-          # Команда сборки для LN882H в OpenBeken
-          make PLATFORM=LN882H -j$(nproc)   
+          make PLATFORM=LN882H -j$(nproc)
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: OpenLN882H_firmware
+          name: ${{ env.APP_NAME }}_LN882H_Build
           path: |
-            apps/OpenBK7231T_App/output/*.bin
+            *.bin
             output/*.bin
-  
+            apps/OpenBK7231T_App/output/*.bin
+            obj/LN882H/*.bin
+          if-no-files-found: error
