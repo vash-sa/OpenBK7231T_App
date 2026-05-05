@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # ОСТАВИЛ ТОЛЬКО ЭТИ ДВЕ
         platform: [ln882h, bl602]
     steps:
       - name: Checkout
