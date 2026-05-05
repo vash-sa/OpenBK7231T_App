@@ -59,10 +59,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install ARM Toolchain
-        uses: arm-software/setup-arm-toolchain@v1
+      - name: Install Arm GNU Toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: '10.3-2021.10'
+
 
       - name: Install Build Tools
         run: |
