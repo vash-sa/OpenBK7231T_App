@@ -1,4 +1,4 @@
-name: Build OpenBK7231T_App
+name: Build App
 
 on:
   push:
@@ -7,73 +7,138 @@ on:
   pull_request:
     branches:
       - '**'
-  workflow_dispatch:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   refs:
-    runs-on: ubuntu-latest
+    name: Prepare CI Environment
+    runs-on: ubuntu-22.04
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      sha_short: ${{ steps.refs.outputs.sha_short }}
+      short_ref: ${{ steps.refs.outputs.short_ref }}
+      version: ${{ steps.refs.outputs.version }}
+      new_release: ${{ steps.refs.outputs.new_release }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Get version
-        id: version
+
+      - name: Semantic Release (Dry Run)
+        id: semantic
+        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set outputs
+        id: refs
         run: |
-          VERSION=$(grep -oP '(?<=#define SOFTWARE_VERSION ")([^"]+)' apps/OpenBK7231T_App/src/new_common.h)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          BRANCH=${GITHUB_REF#refs/*/}
+          echo "branch: ${BRANCH}"
+          BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+          echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
+
+          # Определяем версию
+          if [ "${{ steps.semantic.outputs.new_release_published }}" = "true" ]; then
+            VERSION=${{ steps.semantic.outputs.new_release_version }}
+          else
+            VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+          fi
+
+          echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+          echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build:
+    name: Build for LN882H and BL602
     needs: refs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+
     strategy:
+      fail-fast: false
       matrix:
-        platform: [ln882h, bl602]
+        include:
+          - platform: OpenLN882H
+            variant: default
+            gcc: 10.3-2021.10
+          - platform: OpenBL602
+            variant: default
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Install ARM Toolchain
+
+      - name: Install arm-none-eabi-gcc (for LN882H)
+        if: matrix.platform == 'OpenLN882H'
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
-          release: '10.3-2021.10'
-      - name: Build
+          release: ${{ matrix.gcc }}
+          path-env-var: ARM_NONE_EABI_GCC_PATH
+
+      - name: Run make build
         run: |
-          if [ "${{ matrix.platform }}" == "bk7231t" ]; then
-            python3 .github/scripts/build.py bk7231t
-          elif [ "${{ matrix.platform }}" == "bk7231n" ]; then
-            python3 .github/scripts/build.py bk7231n
-          elif [ "${{ matrix.platform }}" == "bk7231n_small" ]; then
-             python3 .github/scripts/build.py bk7231n_small
-          elif [ "${{ matrix.platform }}" == "w600" ]; then
-            cd platforms/w60x && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "w800" ]; then
-            cd platforms/w80x && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "xr809" ]; then
-            cd platforms/xr809 && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "bl602" ]; then
-            cd platforms/bl602 && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "ln882h" ]; then
-            cd platforms/ln882h && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "esp32" ]; then
-            cd platforms/esp32 && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "esp32c3" ]; then
-            cd platforms/esp32c3 && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "esp32s2" ]; then
-            cd platforms/esp32s2 && chmod +x build.sh && ./build.sh
-          elif [ "${{ matrix.platform }}" == "esp32s3" ]; then
-            cd platforms/esp32s3 && chmod +x build.sh && ./build.sh
-          fi
-      - name: Upload build artifacts
+          make APP_VERSION=${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }} \
+               APP_NAME=${{ matrix.platform }} \
+               VARIANT="${{ matrix.variant }}" \
+               ${{ matrix.platform }}
+
+      - name: Save build assets as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_${{ matrix.platform }}
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}_${{ matrix.platform }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}
           path: |
-            output/${{ needs.refs.outputs.version }}/*.bin
-          if-no-files-found: warn
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.bin
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.img
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.rbl
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.fls
+            output/${{ needs.refs.outputs.version }}${{ matrix.variant != 'default' && '_' || '' }}${{ matrix.variant != 'default' && matrix.variant || '' }}/${{ matrix.platform }}_*.ota.img
+
+  merge:
+    name: Merge Artifacts for Release
+    runs-on: ubuntu-22.04
+    needs: [refs, build]
+    # Запускается всегда, но финальный релиз (release) будет только если это main или alpha и есть новая версия
+    steps:
+      - name: Merge Artifacts into single archive
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}
+          delete-merged: true
+
+  release:
+    name: Publish Release and Artifacts
+    runs-on: ubuntu-22.04
+    needs: [merge, refs]
+    if: always() && needs.refs.outputs.new_release == 'true' && (github.ref == 'refs/heads/main' || github.ref_name == 'alpha')
+    steps:
+      - name: Checkout repository for release commit
+        uses: actions/checkout@v4
+
+      - name: Download Merged Artifacts (required for semantic-release plugin)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}_${{ needs.refs.outputs.version }}
+          path: output/${{ needs.refs.outputs.version }}
+
+      - name: Run Semantic Release (Final)
+        id: semantic_final
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: false
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
