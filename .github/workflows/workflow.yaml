@@ -60,7 +60,7 @@ jobs:
           submodules: recursive
 
       - name: Install ARM Toolchain
-        uses: emmanuel-martinez/install-arm-none-eabi-gcc@v1
+        uses: arm-software/setup-arm-toolchain@v1
         with:
           release: '10.3-2021.10'
 
