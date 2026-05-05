@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - '**'
+  workflow_dispatch:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -14,37 +15,18 @@ env:
 jobs:
   refs:
     name: Prepare CI Environment
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.refs.outputs.version }}
     steps:
       - name: Source checkout
         uses: actions/checkout@v4
-      - name: Semantic Release
-        id: semantic
-        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          dry_run: true
-          semantic_version: 21
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            conventional-changelog-conventionalcommits@7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Set outputs
         id: refs
         run: |
           export BRANCH=${GITHUB_REF#refs/*/}
           export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
-          export VERSION=""
-          if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
-            export VERSION=${{ steps.semantic.outputs.new_release_version }}
-          else
-            export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
-          fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
 
   build:
     name: Build MCU
@@ -59,7 +41,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install ARM Toolchain
-        uses: emmanuel-martinez/install-arm-none-eabi-gcc@v1
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: '10.3-2021.10'
       - name: Build
