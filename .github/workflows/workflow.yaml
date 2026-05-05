@@ -1,9 +1,11 @@
 name: Build LN882H Custom
 on:
   push:
-    branches: - '**'
+    branches: 
+      - '**'
   pull_request:
-    branches: - '**'
+    branches: 
+      - '**'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
