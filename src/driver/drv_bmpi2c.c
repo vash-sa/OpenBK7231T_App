@@ -3,11 +3,6 @@
 #include "../logging/logging.h"
 #include "drv_local.h"
 #include <limits.h>
-// Исправление для LN882H и других платформ без прямой delay_ms
-#ifndef delay_ms
-    extern void rtos_delay_milliseconds(int ms);
-    #define delay_ms rtos_delay_milliseconds
-#endif
 
 static byte g_secondsBetweenMeasurements = 1, g_secondsUntilNextMeasurement = 1;
 static int32_t g_temperature, g_calTemp = 0, g_calHum = 0, g_calPres = 0;
