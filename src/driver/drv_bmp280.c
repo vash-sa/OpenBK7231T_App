@@ -9,6 +9,7 @@
 #include "drv_uart.h"
 #include "../httpserver/new_http.h"
 #include "../hal/hal_pins.h"
+#define delay_ms rtos_delay_milliseconds
 
 #ifdef ENABLE_DRIVER_BMP280
 
