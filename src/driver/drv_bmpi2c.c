@@ -3,6 +3,11 @@
 #include "../logging/logging.h"
 #include "drv_local.h"
 #include <limits.h>
+#ifdef PLATFORM_LN882H
+    #include "utils/debug/log.h"
+    #include "kernel/osal/osal.h"
+    #define delay_ms(x) osal_msleep(x)
+#endif
 
 static byte g_secondsBetweenMeasurements = 1, g_secondsUntilNextMeasurement = 1;
 static int32_t g_temperature, g_calTemp = 0, g_calHum = 0, g_calPres = 0;
@@ -13,6 +18,7 @@ static char* g_chipName = "BMPI2C";
 bool isConfigured = false;
 
 #include "drv_bmpi2c.h"
+
 
 commandResult_t BMPI2C_Configure(const void* context, const char* cmd, const char* args, int cmdFlags)
 {
