@@ -124,6 +124,3 @@ void os_free(void* ptr)
 }
 
 #endif
-void delay_ms(int ms) {
-    OS_MsDelay(ms);
-}
