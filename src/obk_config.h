@@ -428,6 +428,7 @@
 //#define ENABLE_DRIVER_TINYIR_NEC				1
 //#define ENABLE_DRIVER_AHT2X						  1
 //#define ENABLE_I2C							        1
+#define delay_ms(ms) OS_MsDelay(ms)
 #define ENABLE_DRIVER_BMPI2C					  1
 //#define ENABLE_DRIVER_BMP280             1
 
