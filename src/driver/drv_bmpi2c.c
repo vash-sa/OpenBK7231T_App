@@ -3,10 +3,10 @@
 #include "../logging/logging.h"
 #include "drv_local.h"
 #include <limits.h>
-#ifdef PLATFORM_LN882H
-    #include "utils/debug/log.h"
-    #include "kernel/osal/osal.h"
-    #define delay_ms(x) osal_msleep(x)
+// Исправление для LN882H и других платформ без прямой delay_ms
+#ifndef delay_ms
+    extern void rtos_delay_milliseconds(int ms);
+    #define delay_ms rtos_delay_milliseconds
 #endif
 
 static byte g_secondsBetweenMeasurements = 1, g_secondsUntilNextMeasurement = 1;
