@@ -1239,6 +1239,22 @@ static driver_t g_drivers[] = {
 	false,                                   // loaded
 	},
 #endif
+#if ENABLE_DRIVER_BH1750
+	//drvdetail:{"name":"BH1750",
+	//drvdetail:"title":"TODO",
+	//drvdetail:"descr":"BH1750 Ambient Light Intensity sensor.",
+	//drvdetail:"requires":""}
+	{ "BH1750",                             // Driver Name
+	BH1750_Init,                            // Init
+	BH1750_OnEverySecond,                    // onEverySecond
+	NULL,                                   // appendInformationToHTTPIndexPage
+	NULL,                                   // runQuickTick
+	NULL,                                   // stopFunction
+	NULL,                                   // onChannelChanged
+	NULL,                                   // onHassDiscovery
+	false,                                  // loaded
+	},
+#endif
 #if ENABLE_DRIVER_DS1820
 	//drvdetail:{"name":"DS1820",
 	//drvdetail:"title":"TODO",
@@ -1806,7 +1822,7 @@ bool DRV_IsMeasuringBattery() {
 
 bool DRV_IsSensor() {
 #ifndef OBK_DISABLE_ALL_DRIVERS
-	return DRV_IsRunning("SHT3X") || DRV_IsRunning("CHT83XX") || DRV_IsRunning("SGP") || DRV_IsRunning("AHT2X") || DRV_IsRunning("DS1820") || DRV_IsRunning("DS1820_full");
+	return DRV_IsRunning("SHT3X") || DRV_IsRunning("CHT83XX") || DRV_IsRunning("SGP") || DRV_IsRunning("AHT2X") || DRV_IsRunning("DS1820") || DRV_IsRunning("DS1820_full") || DRV_IsRunning("BH1750");
 #else
 	return false;
 #endif
