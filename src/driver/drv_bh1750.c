@@ -1,3 +1,5 @@
+#include "../obk_config.h"
+
 #if ENABLE_DRIVER_BH1750
 
 #include "../new_common.h"
