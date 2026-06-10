@@ -1240,6 +1240,8 @@ static driver_t g_drivers[] = {
 	},
 #endif
 #if ENABLE_DRIVER_BH1750
+    extern void BH1750_Init(void);
+    extern void BH1750_OnEverySecond(void);
 	//drvdetail:{"name":"BH1750",
 	//drvdetail:"title":"TODO",
 	//drvdetail:"descr":"BH1750 Ambient Light Intensity sensor.",
