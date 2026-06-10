@@ -3,10 +3,7 @@
 #include "../new_cfg.h"
 #include "drv_public.h"
 #include "drv_local.h"
-
-#define BH1750_I2C_ADDR         0x23
-#define BH1750_CMD_POWER_ON     0x01
-#define BH1750_CMD_CONTINUOUS   0x10
+#include "drv_bh1750.h"
 
 static int g_bh1750_scl_pin = -1;
 static int g_bh1750_sda_pin = -1;
