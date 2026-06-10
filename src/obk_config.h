@@ -431,6 +431,7 @@
 #define delay_ms(ms) OS_MsDelay(ms)
 #define ENABLE_DRIVER_BMPI2C					  1
 //#define ENABLE_DRIVER_BMP280             1
+#define ENABLE_DRIVER_BH1750            1
 
 #elif PLATFORM_ESPIDF
 
