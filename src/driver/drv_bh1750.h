@@ -1,7 +1,5 @@
-#ifndef __DRV_BH1750_H__
-#define __DRV_BH1750_H__
-
-void BH1750_Init(void);
-void BH1750_OnEverySecond(void);
-
-#endif
+#define BH1750_I2C_ADDR         0x23
+#define BH1750_CMD_POWER_DOWN   0x00
+#define BH1750_CMD_POWER_ON     0x01
+#define BH1750_CMD_RESET        0x07
+#define BH1750_CMD_CONTINUOUS   0x10
