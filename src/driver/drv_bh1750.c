@@ -1,3 +1,5 @@
+#if ENABLE_DRIVER_BH1750
+
 #include "../new_common.h"
 #include "../new_pins.h"
 #include "../new_cfg.h"
@@ -112,9 +114,12 @@ void BH1750_OnEverySecond(void) {
     if (!g_bh1750_init_ok) {
         return;
     }
+
     g_bh1750_secondsElapsed++;
     if (g_bh1750_secondsElapsed >= g_bh1750_secondsBetweenMeasurements) {
         BH1750_Measure();
         g_bh1750_secondsElapsed = 0;
     }
 }
+
+#endif
