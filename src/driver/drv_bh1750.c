@@ -1,5 +1,7 @@
 #include "../obk_config.h"
 
+#if defined(PLATFORM_LN882H)
+
 #include "../new_common.h"
 #include "../new_pins.h"
 #include "../new_cfg.h"
@@ -125,3 +127,4 @@ void BH1750_OnEverySecond(void) {
         g_bh1750_secondsElapsed = 0;
     }
 }
+#endif // PLATFORM_LN882H
