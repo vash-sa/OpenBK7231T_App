@@ -24,11 +24,10 @@ void BH1750_Measure(void) {
         return;
     }
 
-    // Запускаем чтение 2 байт через структуру I2C
-    Soft_I2C_Start(&g_bh1750_i2c);
-    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1) | 1) == false) {
+    // Стартуем I2C в режиме чтения (адрес с битом чтения)
+    if (Soft_I2C_Start(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1) | 1) == false) {
         Soft_I2C_Stop(&g_bh1750_i2c);
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Address NACK on read");
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Read start failed");
         return;
     }
     
@@ -68,24 +67,21 @@ commandResult_t BH1750_ForceMeasure(const void *context, const char *cmd, const 
 
 // Инициализация
 void BH1750_Init(void) {
-    uint8_t cmd;
-
     if (Tokenizer_GetArgsCount() < 3) {
         addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750 driver requires 3 args: [SCL] [SDA] [Lux_Channel]");
         g_bh1750_init_ok = false;
         return;
     }
 
-    g_bh1750_i2c.pin_scl = Tokenizer_GetArgInteger(0);
-    g_bh1750_i2c.pin_sda = Tokenizer_GetArgInteger(1);
+    // Привязываем пины к правильным именам структуры OpenBeken
+    g_bh1750_i2c.pin_clk = Tokenizer_GetArgInteger(0);
+    g_bh1750_i2c.pin_data = Tokenizer_GetArgInteger(1);
     g_bh1750_lux_channel = Tokenizer_GetArgInteger(2);
 
-    // Инициализация пинов I2C структуры
     Soft_I2C_PreInit(&g_bh1750_i2c);
 
     // 1. Команда Power ON
-    Soft_I2C_Start(&g_bh1750_i2c);
-    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
+    if (Soft_I2C_Start(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
         Soft_I2C_WriteByte(&g_bh1750_i2c, BH1750_CMD_POWER_ON) == false) {
         Soft_I2C_Stop(&g_bh1750_i2c);
         addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Power ON failed");
@@ -97,8 +93,7 @@ void BH1750_Init(void) {
     rtos_delay_milliseconds(10);
 
     // 2. Режим Continuous High Res Mode
-    Soft_I2C_Start(&g_bh1750_i2c);
-    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
+    if (Soft_I2C_Start(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
         Soft_I2C_WriteByte(&g_bh1750_i2c, BH1750_CMD_CONTINUOUS) == false) {
         Soft_I2C_Stop(&g_bh1750_i2c);
         addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Failed to set mode");
@@ -112,7 +107,7 @@ void BH1750_Init(void) {
     CMD_RegisterCommand("BH1750_Measure", BH1750_ForceMeasure, NULL);
 
     addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Started on SCL:%d SDA:%d TargetChannel:%d", 
-              g_bh1750_i2c.pin_scl, g_bh1750_i2c.pin_sda, g_bh1750_lux_channel);
+              g_bh1750_i2c.pin_clk, g_bh1750_i2c.pin_data, g_bh1750_lux_channel);
               
     g_bh1750_init_ok = true;
     g_bh1750_secondsElapsed = 0;
