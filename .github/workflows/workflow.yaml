@@ -55,7 +55,7 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build:
-    name: Build for LN882H and BL602
+    name: Build for LN882H # and BL602
     needs: refs
     runs-on: ubuntu-22.04
 
@@ -66,8 +66,8 @@ jobs:
           - platform: OpenLN882H
             variant: default
             gcc: 10.3-2021.10
-          - platform: OpenBL602
-            variant: default
+#         - platform: OpenBL602
+#           variant: default
 
     steps:
       - name: Checkout repository
