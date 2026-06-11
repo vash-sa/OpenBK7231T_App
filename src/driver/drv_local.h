@@ -150,6 +150,9 @@ void AHT2X_AppendInformationToHTTPIndexPage(http_request_t *request, int bPreSta
 void AHT2X_OnEverySecond();
 void AHT2X_StopDriver();
 
+void BH1750_Init();
+void BH1750_OnEverySecond();
+
 void BMPI2C_Init();
 void BMPI2C_AppendInformationToHTTPIndexPage(http_request_t *request, int bPreState);
 void BMPI2C_OnEverySecond();
