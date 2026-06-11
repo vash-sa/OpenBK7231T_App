@@ -9,14 +9,15 @@
 #include "drv_local.h"
 #include "drv_bh1750.h"
 
-static softI2C_t g_bh1750_i2c;
-static int g_bh1750_lux_channel = -1;
+// Используем общую системную шину ядра OpenBeken, как в AHT2X
+extern softI2C_t g_softI2C; 
 
+static int g_bh1750_lux_channel = -1;
 static int g_bh1750_secondsBetweenMeasurements = 1;
 static int g_bh1750_secondsElapsed = 0;
 static bool g_bh1750_init_ok = false;
 
-// Чтение уровня освещенности с логами
+// Чтение уровня освещенности через системную шину g_softI2C
 void BH1750_Measure(void) {
     uint8_t byte_high = 0;
     uint8_t byte_low = 0;
@@ -28,36 +29,33 @@ void BH1750_Measure(void) {
         return;
     }
 
-    // Пробуем прочитать адрес 0x23 (ручной байт чтения 0x47)
-    Soft_I2C_Start(&g_bh1750_i2c, 0); 
-    if (Soft_I2C_WriteByte(&g_bh1750_i2c, 0x47) == true) {
+    // Запускаем чтение с адреса 0x23 через глобальную g_softI2C
+    if (Soft_I2C_Start(&g_softI2C, 0x23) == true) {
         active_addr = 0x23;
     } else {
-        Soft_I2C_Stop(&g_bh1750_i2c);
-        
-        // Если не ответил, пробуем адрес 0x5C (ручной байт чтения 0xB9)
-        Soft_I2C_Start(&g_bh1750_i2c, 0);
-        if (Soft_I2C_WriteByte(&g_bh1750_i2c, 0xB9) == true) {
+        Soft_I2C_Stop(&g_softI2C);
+        // Пробуем альтернативный адрес 0x5C
+        if (Soft_I2C_Start(&g_softI2C, 0x5C) == true) {
             active_addr = 0x5C;
         } else {
-            Soft_I2C_Stop(&g_bh1750_i2c);
-            addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: I2C NACK on both 0x47 and 0xB9. Check lines SCL/SDA");
+            Soft_I2C_Stop(&g_softI2C);
+            addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: System I2C NACK during measure.");
             return;
         }
     }
     
-    // Читаем байты результатов (0 - ACK, 1 - NACK)
-    byte_high = Soft_I2C_ReadByte(&g_bh1750_i2c, 0); 
-    byte_low = Soft_I2C_ReadByte(&g_bh1750_i2c, 1); 
-    Soft_I2C_Stop(&g_bh1750_i2c);
+    // Читаем байты (0 - ACK, 1 - NACK)
+    byte_high = Soft_I2C_ReadByte(&g_softI2C, 0); 
+    byte_low = Soft_I2C_ReadByte(&g_softI2C, 1); 
+    Soft_I2C_Stop(&g_softI2C);
 
     // Склеиваем результат
     raw_lux = (byte_high << 8) | byte_low;
     lux = (float)raw_lux / 1.2f;
 
-    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Responded on 0x%02X. Calculated: %d lux", active_addr, (int)lux);
+    addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Success on 0x%02X! Calculated: %d lux", active_addr, (int)lux);
 
-    // Пишем в веб-интерфейс
+    // Выводим в веб-интерфейс
     CHANNEL_Set(g_bh1750_lux_channel, (int)lux, 0);
 }
 
@@ -80,39 +78,37 @@ commandResult_t BH1750_ForceMeasure(const void *context, const char *cmd, const 
     return CMD_RES_OK;
 }
 
-// Инициализация
+// Инициализация по образу и подобию AHT2X
 void BH1750_Init(void) {
-    if (Tokenizer_GetArgsCount() < 3) {
-        g_bh1750_init_ok = false;
-        return;
+    // В OpenBeken пины извлекаются функциями ядра Tokenizer_GetPin
+    g_softI2C.pin_clk = Tokenizer_GetPin(1, 9);
+    g_softI2C.pin_data = Tokenizer_GetPin(2, 14);
+    g_bh1750_lux_channel = Tokenizer_GetArgIntegerDefault(3, -1);
+
+    // Запуск системной шины I2C
+    Soft_I2C_PreInit(&g_softI2C);
+    rtos_delay_milliseconds(100);
+
+    // Включение датчика (Команда 0x01)
+    if (Soft_I2C_Start(&g_softI2C, 0x23) == true) {
+        Soft_I2C_WriteByte(&g_softI2C, 0x01);
+        Soft_I2C_Stop(&g_softI2C);
     }
-
-    g_bh1750_i2c.pin_clk = Tokenizer_GetArgInteger(0);
-    g_bh1750_i2c.pin_data = Tokenizer_GetArgInteger(1);
-    g_bh1750_lux_channel = Tokenizer_GetArgInteger(2);
-
-    Soft_I2C_PreInit(&g_bh1750_i2c);
-
-    // Включение (Команда 0x01) на чистые адреса записи
-    if (Soft_I2C_Start(&g_bh1750_i2c, 0x23) == true) {
-        Soft_I2C_WriteByte(&g_bh1750_i2c, 0x01);
-        Soft_I2C_Stop(&g_bh1750_i2c);
-    }
-    if (Soft_I2C_Start(&g_bh1750_i2c, 0x5C) == true) {
-        Soft_I2C_WriteByte(&g_bh1750_i2c, 0x01);
-        Soft_I2C_Stop(&g_bh1750_i2c);
+    if (Soft_I2C_Start(&g_softI2C, 0x5C) == true) {
+        Soft_I2C_WriteByte(&g_softI2C, 0x01);
+        Soft_I2C_Stop(&g_softI2C);
     }
 
     rtos_delay_milliseconds(10);
 
     // Запуск измерения (Команда 0x10)
-    if (Soft_I2C_Start(&g_bh1750_i2c, 0x23) == true) {
-        Soft_I2C_WriteByte(&g_bh1750_i2c, 0x10);
-        Soft_I2C_Stop(&g_bh1750_i2c);
+    if (Soft_I2C_Start(&g_softI2C, 0x23) == true) {
+        Soft_I2C_WriteByte(&g_softI2C, 0x10);
+        Soft_I2C_Stop(&g_softI2C);
     }
-    if (Soft_I2C_Start(&g_bh1750_i2c, 0x5C) == true) {
-        Soft_I2C_WriteByte(&g_bh1750_i2c, 0x10);
-        Soft_I2C_Stop(&g_bh1750_i2c);
+    if (Soft_I2C_Start(&g_softI2C, 0x5C) == true) {
+        Soft_I2C_WriteByte(&g_softI2C, 0x10);
+        Soft_I2C_Stop(&g_softI2C);
     }
 
     CMD_RegisterCommand("BH1750_Cycle", BH1750_Cycle, NULL);
