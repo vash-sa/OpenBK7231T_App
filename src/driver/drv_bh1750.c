@@ -1,3 +1,5 @@
+#include "../obk_config.h"
+
 #include "../new_common.h"
 #include "../new_pins.h"
 #include "../new_cfg.h"
@@ -5,11 +7,10 @@
 #include "drv_local.h"
 #include "drv_bh1750.h"
 
-static int g_bh1750_scl_pin = -1;
-static int g_bh1750_sda_pin = -1;
+static softI2C_t g_bh1750_i2c;
 static int g_bh1750_lux_channel = -1;
 
-static int g_bh1750_secondsBetweenMeasurements = 1; // По умолчанию 1 сек (как в AHT2X)
+static int g_bh1750_secondsBetweenMeasurements = 1;
 static int g_bh1750_secondsElapsed = 0;
 static bool g_bh1750_init_ok = false;
 
@@ -23,24 +24,29 @@ void BH1750_Measure(void) {
         return;
     }
 
-    // Читаем 2 байта результата через софтовый I2C, завязанный на пины из аргументов
-    if (Soft_I2C_ReadBytes(g_bh1750_scl_pin, g_bh1750_sda_pin, BH1750_I2C_ADDR, buffer, 2) == false) {
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Read failed on SCL %d, SDA %d", g_bh1750_scl_pin, g_bh1750_sda_pin);
+    // Запускаем чтение 2 байт через структуру I2C
+    Soft_I2C_Start(&g_bh1750_i2c);
+    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1) | 1) == false) {
+        Soft_I2C_Stop(&g_bh1750_i2c);
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Address NACK on read");
         return;
     }
+    
+    Soft_I2C_ReadBytes(&g_bh1750_i2c, buffer, 2);
+    Soft_I2C_Stop(&g_bh1750_i2c);
 
-    // Склеиваем байты (MSB << 8 | LSB)
+    // Склеиваем байты
     raw_lux = (buffer[0] << 8) | buffer[1];
     
     // Формула люксметра
     lux = (float)raw_lux / 1.2f;
 
-    // Пишем в канал, переданный при старте драйвера
+    // Пишем в канал
     CHANNEL_Set(g_bh1750_lux_channel, (int)lux, 0);
     addLogAdv(LOG_DEBUG, LOG_FEATURE_DRV, "BH1750: %d lux", (int)lux);
 }
 
-// Изменение интервала опроса (Эталон: AHT2X_Cycle)
+// Изменение интервала опроса
 commandResult_t BH1750_Cycle(const void *context, const char *cmd, const char *args, int cmdFlags) {
     Tokenizer_TokenizeString(args, 0);
     if (Tokenizer_GetArgsCount() < 1) {
@@ -54,60 +60,65 @@ commandResult_t BH1750_Cycle(const void *context, const char *cmd, const char *a
     return CMD_RES_OK;
 }
 
-// Принудительный ручной замер (Эталон: AHT2X_Measure)
+// Принудительный ручной замер
 commandResult_t BH1750_ForceMeasure(const void *context, const char *cmd, const char *args, int cmdFlags) {
     BH1750_Measure();
     return CMD_RES_OK;
 }
 
-// Инициализация (Эталон: startDriver AHT2X 2 3 2 3)
+// Инициализация
 void BH1750_Init(void) {
     uint8_t cmd;
 
-    // Проверяем, переданы ли аргументы (нужно минимум 3: SCL, SDA, Channel)
     if (Tokenizer_GetArgsCount() < 3) {
         addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750 driver requires 3 args: [SCL] [SDA] [Lux_Channel]");
         g_bh1750_init_ok = false;
         return;
     }
 
-    g_bh1750_scl_pin = Tokenizer_GetArgInteger(0);
-    g_bh1750_sda_pin = Tokenizer_GetArgInteger(1);
+    g_bh1750_i2c.pin_scl = Tokenizer_GetArgInteger(0);
+    g_bh1750_i2c.pin_sda = Tokenizer_GetArgInteger(1);
     g_bh1750_lux_channel = Tokenizer_GetArgInteger(2);
 
-    // Мягкая инициализация пинов в режим I2C
-    Soft_I2C_PreInit(g_bh1750_scl_pin, g_bh1750_sda_pin);
+    // Инициализация пинов I2C структуры
+    Soft_I2C_PreInit(&g_bh1750_i2c);
 
     // 1. Команда Power ON
-    cmd = BH1750_CMD_POWER_ON;
-    if (Soft_I2C_WriteBytes(g_bh1750_scl_pin, g_bh1750_sda_pin, BH1750_I2C_ADDR, &cmd, 1) == false) {
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Power ON failed, check connections");
+    Soft_I2C_Start(&g_bh1750_i2c);
+    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
+        Soft_I2C_WriteByte(&g_bh1750_i2c, BH1750_CMD_POWER_ON) == false) {
+        Soft_I2C_Stop(&g_bh1750_i2c);
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Power ON failed");
         g_bh1750_init_ok = false;
         return;
     }
+    Soft_I2C_Stop(&g_bh1750_i2c);
 
     rtos_delay_milliseconds(10);
 
     // 2. Режим Continuous High Res Mode
-    cmd = BH1750_CMD_CONTINUOUS;
-    if (Soft_I2C_WriteBytes(g_bh1750_scl_pin, g_bh1750_sda_pin, BH1750_I2C_ADDR, &cmd, 1) == false) {
-        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Failed to set measurement mode");
+    Soft_I2C_Start(&g_bh1750_i2c);
+    if (Soft_I2C_WriteByte(&g_bh1750_i2c, (BH1750_I2C_ADDR << 1)) == false ||
+        Soft_I2C_WriteByte(&g_bh1750_i2c, BH1750_CMD_CONTINUOUS) == false) {
+        Soft_I2C_Stop(&g_bh1750_i2c);
+        addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Failed to set mode");
         g_bh1750_init_ok = false;
         return;
     }
+    Soft_I2C_Stop(&g_bh1750_i2c);
 
-    // Регистрируем дополнительные рантайм-команды
+    // Регистрируем команды
     CMD_RegisterCommand("BH1750_Cycle", BH1750_Cycle, NULL);
     CMD_RegisterCommand("BH1750_Measure", BH1750_ForceMeasure, NULL);
 
     addLogAdv(LOG_INFO, LOG_FEATURE_DRV, "BH1750: Started on SCL:%d SDA:%d TargetChannel:%d", 
-              g_bh1750_scl_pin, g_bh1750_sda_pin, g_bh1750_lux_channel);
+              g_bh1750_i2c.pin_scl, g_bh1750_i2c.pin_sda, g_bh1750_lux_channel);
               
     g_bh1750_init_ok = true;
     g_bh1750_secondsElapsed = 0;
 }
 
-// Ежесекундный таймер ядра OpenBeken
+// Ежесекундный таймер
 void BH1750_OnEverySecond(void) {
     if (!g_bh1750_init_ok) {
         return;
